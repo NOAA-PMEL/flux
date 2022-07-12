@@ -1,0 +1,46 @@
+{
+  "config": {
+    "ui": {
+      "html_title": "OceanSITES Data",
+      "default_id": "tao_flux_clim_lwr_absolute",
+      "title": "Flux Data",
+      "href": "https://www.pmel.noaa.gov/gtmba/oceansites",
+      "max_columns": 1,
+      "logos": [
+        {
+          "logo": "assets/logo.gif"
+        }
+      ]
+    },
+    "datasets": [
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_clim_lwr_absolute",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_clim_lwr_absolute.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&distinct()&orderBy(\"site_code\")"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_clim_lwr_relative",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_clim_lwr_relative.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&distinct()&orderBy(\"site_code\")"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_absolute",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_absolute.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&distinct()&orderBy(\"site_code\")"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_relative",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/tao_flux_relative.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&distinct()&orderBy(\"site_code\")"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/WHOI_flux",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/WHOI_flux.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&distinct()"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/ocs_keo_flux",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/ocs_keo_flux.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&time%3E=2020-05-12T00%3A00%3A00Z&time%3C=2020-05-19T03%3A00%3A00Z&distinct()"
+      },
+      {
+        "url": "https://data.pmel.noaa.gov/generic/erddap/tabledap/ocs_papa_flux",
+        "locations": "https://data.pmel.noaa.gov/generic/erddap/tabledap/ocs_papa_flux.csv?site_code%2Cwmo_platform_code%2Clatitude%2Clongitude&time%3E=2022-02-17T00%3A00%3A00Z&time%3C=2022-02-24T17%3A00%3A00Z&distinct()"
+      }
+    ]
+  }
+}
