@@ -51,7 +51,7 @@
       ]
     },
     "turbulent_heat_flux": {
-      "question": "Stations with Turbulent Heat Flux",
+      "question": "Stations with Bulk Turbulent Heat Flux",
       "search": [
           {
             "join": "and",
