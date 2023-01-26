@@ -89,8 +89,7 @@ for dataset in platform_json['config']['datasets']:
 
 pp = pprint.PrettyPrinter(indent=4)
 
-with open('key.txt') as key:
-    ESRI_API_KEY = key.readline()
+ESRI_API_KEY = os.environ.get('ESRI_API_KEY')
 
 discovery_file = 'flux_discovery.json'
 if discovery_file is None:
