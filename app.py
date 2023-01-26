@@ -108,10 +108,6 @@ for key in discover_json['discovery']:
     radio_options.append({'label': q['question'], 'value': key})
 
 
-with open('key.txt') as key:
-    ESRI_API_KEY = key.readline()
-
-
 all_start = None
 all_end = None
 all_start_seconds = 999999999999999
