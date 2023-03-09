@@ -20,7 +20,7 @@ import flask
 import urllib
 
 # My stuff
-import sdig.erddap.info as info
+from sdig.erddap.info import Info
 
 version = 'v1.4'  # Add units to y-axis label
 empty_color = '#999999'
@@ -67,11 +67,10 @@ for dataset in platform_json['config']['datasets']:
     locations_url = dataset['locations']
     did = url[url.rindex('/') + 1:]
     dataset['id'] = did
-    info_url = info.get_info_url(url)
-    info_df = pd.read_csv(info_url)
-    title = info.get_title(info_df)
+    info = Info(url)
+    title = info.get_title()
     dataset['title'] = title
-    variables_list, long_names, units, standard_names = info.get_variables(info_df)
+    variables_list, long_names, units, standard_names = info.get_variables()
     units_by_did[did] = units
     variables_by_did[did] = variables_list
     mdf = pd.read_csv(locations_url, skiprows=[1],
@@ -115,9 +114,8 @@ all_end_seconds = -999999999999999
 
 for dataset in platform_json['config']['datasets']:
     url = dataset['url']
-    info_url = info.get_info_url(url)
-    info_df = pd.read_csv(info_url)
-    start_date, end_date, start_date_seconds, end_date_seconds = info.get_times(info_df)
+    my_info = Info(url)
+    start_date, end_date, start_date_seconds, end_date_seconds = my_info.get_times()
     if start_date_seconds < all_start_seconds:
         all_start_seconds = start_date_seconds
         all_start = start_date
@@ -125,7 +123,7 @@ for dataset in platform_json['config']['datasets']:
         all_end_seconds = end_date_seconds
         all_end = end_date
 
-time_marks = info.get_time_marks(all_start_seconds, all_end_seconds)
+time_marks = Info.get_time_marks(all_start_seconds, all_end_seconds)
 
 
 app = dash.Dash(__name__,
@@ -476,7 +474,6 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                         have_url = dataset_to_check + '.csv?' + short_names + time_constraint
                         have = None
                         try:
-                            print(have_url)
                             have = pd.read_csv(have_url, skiprows=[1])
                         except:
                             pass
