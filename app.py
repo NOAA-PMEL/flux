@@ -30,7 +30,7 @@ month_step = 60*60*24*30.25
 d_format = "%Y-%m-%d"
 
 height_of_row = 345
-legend_gap = height_of_row*.88
+legend_gap = height_of_row
 line_rgb = 'rgba(.04,.04,.04,.2)'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 
@@ -705,6 +705,8 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         col.children = []
         sub_plots = {}
         sub_plot_titles = []
+        sub_plot_bottom_titles = []
+        legends = []
         y_titles = []
         row_h = []
         p_idx = 0
@@ -721,6 +723,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                 link_group = dbc.ListGroup(horizontal=True)
                 link_group.children = []
                 for pd_data_url in search['datasets']:
+                    legend_members = []
                     if p_did in pd_data_url:
                         list_group.children.append(link_group)
                         p_idx = p_idx + 1
@@ -734,7 +737,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                                                       href=p_url, target='_blank')
                         link_group.children.append(meta_item)
                         p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
-                        print('Making a plot of =' + p_url)
+                        print('Making a plot of ' + p_url)
                         read_data = pd.read_csv(p_url, skiprows=[1])
                         item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
                         link_group.children.append(item)
@@ -747,13 +750,16 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                         read_data.loc[:, 'time'] = pd.to_datetime(read_data['time'])
                         plot_data = make_gaps(read_data, '1H')
                         traces = []
-                        sub_title = current_dataset['title'] + ' at ' + selected_platform
+                        sub_title = selected_platform
+                        bottom_title = current_dataset['title']
                         if plot_data.shape[0] > sub_sample_limit:
                             plot_data = plot_data.sample(n=sub_sample_limit).sort_values('time')
                             sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
                         sub_plot_titles.append(sub_title)
+                        sub_plot_bottom_titles.append(bottom_title)
                         plot_units = ''
                         for vidx, p_var in enumerate(search['short_names']):
+                            legend_members.append(p_var)
                             if p_var in units_by_did[p_did]:
                                 plot_units = '(' + units_by_did[p_did][p_var] + ')'
                                 y_titles.append(plot_units)
@@ -768,11 +774,14 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                                                  marker={'color': plot_line_color,},
                                                  hoverinfo="text",
                                                  hoverlabel=dict(namelength=-1),
-                                                 legendgroup=p_idx,
+                                                 showlegend=False,
+                                                 #legendgroup=p_idx,
                                                  )
                             traces.append(trace)
                         sub_plots[p_did] = traces
+                        legends.append(legend_members)
         figure = make_subplots(rows=len(sub_plot_titles), cols=1, shared_xaxes='all', subplot_titles=sub_plot_titles,
+                               vertical_spacing=(.33/len(sub_plot_titles)),
                                shared_yaxes=False,
                                row_heights=row_h)
         graph_height = height_of_row * len(sub_plot_titles)
@@ -782,7 +791,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
 
                 figure.add_trace(p_trace, row=pidx+1, col=1)
                 figure.update_yaxes(title=y_titles[pidx], row=pidx+1, col=1)
-        figure['layout'].update(height=graph_height, margin=dict(l=80, r=80, b=80, t=80, ))
+        figure['layout'].update(height=graph_height,) # margin=dict(l=80, r=80, b=80, t=10, )
         figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified', legend_tracegroupgap=legend_gap)
         figure.update_xaxes({
                 'ticklabelmode': 'period',
@@ -793,14 +802,71 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                 'showline': True,
                 'linewidth': 1,
                 'linecolor': line_rgb,
-                'mirror': True})
+                'mirror': True,
+                'tickfont': {'size': 16},
+                'tickformatstops' : [
+                    dict(dtickrange=[1000, 60000], value="%H:%M:%S\n%d%b%Y"),
+                    dict(dtickrange=[60000, 3600000], value="%H:%M\n%d%b%Y"),
+                    dict(dtickrange=[3600000, 86400000], value="%H:%M\n%d%b%Y"),
+                    dict(dtickrange=[86400000, 604800000], value="%e\n%b %Y"),
+                    dict(dtickrange=[604800000, "M1"], value="%b\n%Y"),
+                    dict(dtickrange=["M1", "M12"], value="%b\n%Y"),
+                    dict(dtickrange=["M12", None], value="%Y")
+                ]
+        })
         figure.update_yaxes({'gridcolor': line_rgb,
                              'zeroline': True,
                              'zerolinecolor': line_rgb,
                              'showline': True,
                              'linewidth': 1,
                              'linecolor': line_rgb,
-                             'mirror': True})
+                             'mirror': True,
+                             'tickfont': {'size': 14}
+                             })
+        # if len(sub_plot_titles[0]) < 10:
+        #     figure.update_annotations(x=.03, font_size=22)
+        # else:
+        #     figure.update_annotations(x=.2, font_size=22)
+        figure.update_annotations(x=.01, font_size=22, xanchor='left', xref='x domain')
+        # figure.update_layout(legend=dict(
+        #     yanchor="top",
+        #     y=0.99,
+        #     xanchor="left",
+        #     x=0.01,
+        #     orientation='v',
+        # ))
+        for bidx, bottom_title in enumerate(sub_plot_bottom_titles):
+            figure.add_annotation(
+                xref='x domain',
+                yref='y domain',
+                xanchor='right',
+                yanchor='bottom',
+                x=1.0,
+                y=-.40,
+                font_size=18,
+                text=bottom_title,
+                showarrow=False,
+                row=(bidx+1), 
+                col=1,
+                bgcolor='rgba(255,255,255,.85)',
+            )
+            plot_legends = legends[bidx]
+            for pli, leg_entry in enumerate(plot_legends):
+                figure.add_annotation(
+                    xref='x domain',
+                    yref='y domain',
+                    xanchor='left',
+                    x=0.01,
+                    y=.95-(pli/10),
+                    font_size=14,
+                    font_color=px.colors.qualitative.Plotly[pli],
+                    text=u'<b>\u23AF\u23AF\u23AF\u23AF</b>  '+leg_entry,
+                    showarrow=False,
+                    row=(bidx+1), 
+                    col=1,
+                    bgcolor='rgba(255,255,255,.85)',
+                )
+            
         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
         query = query + '&lon=' + str(selected_json['lon'])
