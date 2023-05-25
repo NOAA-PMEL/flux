@@ -22,7 +22,7 @@ import urllib
 # My stuff
 from sdig.erddap.info import Info
 
-version = 'v1.4'  # Add units to y-axis label
+version = 'v1.5'  # Change formatting and add specs for the time axis.
 empty_color = '#999999'
 has_data_color = 'black'
 
