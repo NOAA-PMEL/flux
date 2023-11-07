@@ -22,7 +22,7 @@ import urllib
 # My stuff
 from sdig.erddap.info import Info
 
-version = 'v1.5'  # Change formatting and add specs for the time axis.
+version = 'v1.5.1'  # Legends, title
 empty_color = '#999999'
 has_data_color = 'black'
 
@@ -70,7 +70,7 @@ for dataset in platform_json['config']['datasets']:
     info = Info(url)
     title = info.get_title()
     dataset['title'] = title
-    variables_list, long_names, units, standard_names = info.get_variables()
+    variables_list, long_names, units, standard_names, d_types = info.get_variables()
     units_by_did[did] = units
     variables_by_did[did] = variables_list
     mdf = pd.read_csv(locations_url, skiprows=[1],
@@ -132,6 +132,7 @@ app = dash.Dash(__name__,
                 )
 
 app._favicon = 'favicon.ico'
+app.title = 'Flux'
 server = app.server
 
 app.layout = \
@@ -173,6 +174,15 @@ app.layout = \
                                 )]
                             ),
                             dbc.Col(width=4),
+                            # dbc.Col(width=4, children=[
+                            #     html.Div(children=[
+                            #     html.Div('Parts of the US government are closed. This site will not be updated; however, NOAA websites and social media channels necessary to protect lives and property will be maintained. See ', style={'display':'inline'}), 
+                            #     html.A('www.weather.gov', href='https://www.weather.gov', style={'display':'inline'}), 
+                            #     html.Div(' for critical weather information. To learn more, see ', style={'display': 'inline'}), 
+                            #     html.A('www.commerce.gov', href='https://www.commerce.gov', style={'display':'inline'}), 
+                            #     html.Div('.', style={'display':'inline'}),
+                            #     ], style={'display':'inline'})
+                            # ]),
                             dbc.Col(width=3, children=[
                                 dcc.Loading(id='nav-loader', children=[
                                     html.Div(id='loading-div'),
@@ -726,6 +736,12 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                     legend_members = []
                     if p_did in pd_data_url:
                         list_group.children.append(link_group)
+                        if p_idx == 0:
+                            lgnd = 'legend'
+                            show_l = True
+                        else:
+                            lgnd = 'legend' + str(p_idx+1)
+                            show_l = False
                         p_idx = p_idx + 1
                         plot_title = 'Plot of ' + ','.join(search['short_names']) + ' at ' + selected_platform
                         row_h.append(1/len(dids))
@@ -774,8 +790,9 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                                                  marker={'color': plot_line_color,},
                                                  hoverinfo="text",
                                                  hoverlabel=dict(namelength=-1),
-                                                 showlegend=False,
-                                                 #legendgroup=p_idx,
+                                                 showlegend=show_l,
+                                                 legend=lgnd,
+                                                 legendgroup=p_var
                                                  )
                             traces.append(trace)
                         sub_plots[p_did] = traces
@@ -788,11 +805,16 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         for pidx, plt_did in enumerate(sub_plots):
             p_traces = sub_plots[plt_did]
             for p_trace in p_traces:
-
+                if pidx == 0:
+                    leg = 'legend'
+                else:
+                    leg = 'legend' + str(pidx+1)
                 figure.add_trace(p_trace, row=pidx+1, col=1)
                 figure.update_yaxes(title=y_titles[pidx], row=pidx+1, col=1)
-        figure['layout'].update(height=graph_height,) # margin=dict(l=80, r=80, b=80, t=10, )
-        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified', legend_tracegroupgap=legend_gap)
+                ypos = 1.026 - pidx*(1.0/len(sub_plots))
+            figure['layout'].update({leg: {"yref":"paper", "y": ypos, "xref": "paper", "x": 1.026, "orientation": "v"}})
+        figure['layout'].update(height=graph_height, margin=dict(b=120))
+        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified',)
         figure.update_xaxes({
                 'ticklabelmode': 'period',
                 'showticklabels': True,
