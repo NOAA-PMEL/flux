@@ -264,12 +264,14 @@ app.layout = \
                 ])
             ]),
             dbc.Row(id='plot-row', style={'display': 'none'}, children=[
-                dbc.Card(width=12, id='plot-card', children=[
-                    dbc.CardHeader(id='plot-card-title'),
-                    dbc.CardBody(id='plot-card-body', children=[
-                        dcc.Loading(
-                            dcc.Graph(id='plot-graph', config=graph_config)
-                        )
+                dbc.Col(width=12, children=[
+                    dbc.Card(id='plot-card', children=[
+                        dbc.CardHeader(id='plot-card-title'),
+                        dbc.CardBody(id='plot-card-body', children=[
+                            dcc.Loading(
+                                dcc.Graph(id='plot-graph', config=graph_config)
+                            )
+                        ])
                     ])
                 ])
             ]),
