@@ -128,7 +128,6 @@ time_marks = Info.get_time_marks(all_start_seconds, all_end_seconds)
 
 app = dash.Dash(__name__,
                 external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
-                # requests_pathname_prefix='/dashboard/oceansites/'
                 )
 
 app._favicon = 'favicon.ico'
@@ -265,7 +264,7 @@ app.layout = \
                 ])
             ]),
             dbc.Row(id='plot-row', style={'display': 'none'}, children=[
-                dbc.Card(id='plot-card', children=[
+                dbc.Card(width=12, id='plot-card', children=[
                     dbc.CardHeader(id='plot-card-title'),
                     dbc.CardBody(id='plot-card-body', children=[
                         dcc.Loading(
