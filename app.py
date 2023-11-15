@@ -29,7 +29,7 @@ has_data_color = 'black'
 month_step = 60*60*24*30.25
 d_format = "%Y-%m-%d"
 
-height_of_row = 345
+height_of_row = 450
 legend_gap = height_of_row
 line_rgb = 'rgba(.04,.04,.04,.2)'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
@@ -37,6 +37,13 @@ plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 sub_sample_limit = 88000
 
 have_data_url = 'https://data.pmel.noaa.gov/pmel/erddap/tabledap'
+
+
+y_pos_1_4 = [.999, .73225, .447, 0.161]
+t_pos_1_4 = [.0005, .0005, .018, .036]
+
+y_pos_2 = [.999, .390]
+t_pos_2 = [.0005, .048]
 
 discover_error = '''
 You must configure a DISDOVERY_JSON env variable pointing to the JSON file that defines the which collections
@@ -664,6 +671,228 @@ def update_selected_platform(click, initial_site):
     return [selection]
 
 
+# @app.callback(
+#     [
+#         Output('plot-row', 'style'),
+#         Output('plot-card-title', 'children'),
+#         Output('plot-graph', 'figure'),
+#         Output('download-body', 'children'),
+#         Output('location', 'search'),
+#         Output('loading-div', 'children')
+#     ],
+#     [
+#         Input('selected-platform', 'data'),
+#         Input('start-date', 'value'),
+#         Input('end-date', 'value'),
+#         Input('active-platforms', 'data'),
+#     ],
+#     [
+#         State('radio-items', 'value'),
+#     ], prevent_initial_call=True
+# )
+# def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, active_platforms, question_choice,):
+#     figure = {}
+#     query = ''
+#     row_style = {'display': 'block'}
+#     plot_title = 'No data found.'
+#     active = None
+#     list_group = html.Div()
+#     list_group.children = []
+#     selected_platform = None
+#     if selection_data is not None:
+#         selected_json = json.loads(selection_data)
+#         if 'site_code' in selected_json:
+#             selected_platform = selected_json['site_code']
+#         else:
+#             raise dash.exceptions.PreventUpdate
+#     else:
+#         raise dash.exceptions.PreventUpdate
+#     if active_platforms is not None:
+#         active = pd.read_json(json.loads(active_platforms))
+#     if active is not None and selected_platform is not None:
+#         plot_time = '&time>='+plot_start_date+'&time<='+plot_end_date
+#         to_plot = active.loc[active['site_code'] == selected_platform]
+#         if to_plot.empty:
+#             return [row_style, plot_title, get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
+#         dids = to_plot['did'].to_list()
+#         current_search = None
+#         for a_search in discover_json['discovery']:
+#             if a_search == question_choice:
+#                 current_search = discover_json['discovery'][a_search]
+#         col = dbc.Col(width=12)
+#         col.children = []
+#         sub_plots = {}
+#         sub_plot_titles = []
+#         sub_plot_bottom_titles = []
+#         legends = []
+#         y_titles = []
+#         row_h = []
+#         p_idx = 0
+#         for p_did in dids:
+#             current_dataset = next(
+#                 (item for item in platform_json['config']['datasets'] if item['id'] == p_did), None)
+#             p_url = current_dataset['url']
+#             row = dbc.Row()
+#             card = dbc.Card()
+#             card.children = [dbc.CardHeader(current_dataset['title'] + ' at ' + selected_platform)]
+#             row.children = [card]
+#             col.children.append(row)
+#             for search in current_search['search']:
+#                 link_group = dbc.ListGroup(horizontal=True)
+#                 link_group.children = []
+#                 for pd_data_url in search['datasets']:
+#                     legend_members = []
+#                     if p_did in pd_data_url:
+#                         list_group.children.append(link_group)
+#                         if p_idx == 0:
+#                             lgnd = 'legend'
+#                             show_l = True
+#                         else:
+#                             lgnd = 'legend' + str(p_idx+1)
+#                             show_l = False
+#                         p_idx = p_idx + 1
+#                         plot_title = 'Plot of ' + ','.join(search['short_names']) + ' at ' + selected_platform
+#                         row_h.append(1/len(dids))
+#                         vlist = search['short_names'].copy()
+#                         vlist.append('time')
+#                         vlist.append('site_code')
+#                         pvars = ','.join(vlist)
+#                         meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform,
+#                                                       href=p_url, target='_blank')
+#                         link_group.children.append(meta_item)
+#                         p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
+#                         print('Making a plot of ' + p_url)
+#                         read_data = pd.read_csv(p_url, skiprows=[1])
+#                         item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
+#                         link_group.children.append(item)
+#                         item = dbc.ListGroupItem('.csv', href=p_url.replace('.htmlTable', '.csv'), target='_blank')
+#                         link_group.children.append(item)
+#                         item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
+#                         link_group.children.append(item)
+#                         read_data['site_code'] = read_data['site_code'].astype(str)
+#                         read_data.loc[:, 'text_time'] = read_data['time'].astype(str)
+#                         read_data.loc[:, 'time'] = pd.to_datetime(read_data['time'])
+#                         plot_data = make_gaps(read_data, '1H')
+#                         traces = []
+#                         sub_title = selected_platform
+#                         bottom_title = current_dataset['title']
+#                         if plot_data.shape[0] > sub_sample_limit:
+#                             plot_data = plot_data.sample(n=sub_sample_limit).sort_values('time')
+#                             sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
+#                         sub_plot_titles.append(sub_title)
+#                         sub_plot_bottom_titles.append(bottom_title)
+#                         plot_units = ''
+#                         for vidx, p_var in enumerate(search['short_names']):
+#                             legend_members.append(p_var)
+#                             if p_var in units_by_did[p_did]:
+#                                 plot_units = '(' + units_by_did[p_did][p_var] + ')'
+#                                 y_titles.append(plot_units)
+#                             plot_line_color = px.colors.qualitative.Plotly[vidx]
+#                             plot_data['text'] = p_var + '<br>' + plot_data['text_time'] + '<br>' + plot_data[
+#                                 p_var].apply(lambda x: '{0:.2f}'.format(x))
+#                             trace = go.Scattergl(x=plot_data['time'], y=plot_data[p_var],
+#                                                  connectgaps=False,
+#                                                  name=p_var,
+#                                                  mode='lines',
+#                                                  hovertext=plot_data['text'],
+#                                                  marker={'color': plot_line_color,},
+#                                                  hoverinfo="text",
+#                                                  hoverlabel=dict(namelength=-1),
+#                                                  showlegend=show_l,
+#                                                  legend=lgnd,
+#                                                  legendgroup=p_var
+#                                                  )
+#                             traces.append(trace)
+#                         sub_plots[p_did] = traces
+#                         legends.append(legend_members)
+#         figure = make_subplots(rows=len(sub_plot_titles), cols=1, shared_xaxes='all', subplot_titles=sub_plot_titles,
+#                                vertical_spacing=(.33/len(sub_plot_titles)),
+#                                shared_yaxes=False,
+#                                row_heights=row_h)
+#         graph_height = height_of_row * len(sub_plot_titles)
+#         for pidx, plt_did in enumerate(sub_plots):
+#             p_traces = sub_plots[plt_did]
+#             for p_trace in p_traces:
+#                 if pidx == 0:
+#                     leg = 'legend'
+#                 else:
+#                     leg = 'legend' + str(pidx+1)
+#                 figure.add_trace(p_trace, row=pidx+1, col=1)
+#                 figure.update_yaxes(title=y_titles[pidx], row=pidx+1, col=1)
+#                 ypos = 1.026 - pidx*(1.0/len(sub_plots))
+#             figure['layout'].update({leg: {"yref":"paper", "y": ypos, "xref": "paper", "x": 1.026, "orientation": "v"}})
+#         figure['layout'].update(height=graph_height, margin=dict(b=120))
+#         figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified',)
+#         figure.update_xaxes({
+#                 'ticklabelmode': 'period',
+#                 'showticklabels': True,
+#                 'gridcolor': line_rgb,
+#                 'zeroline': True,
+#                 'zerolinecolor': line_rgb,
+#                 'showline': True,
+#                 'linewidth': 1,
+#                 'linecolor': line_rgb,
+#                 'mirror': True,
+#                 'tickfont': {'size': 16},
+#                 'tickformatstops' : [
+#                     dict(dtickrange=[1000, 60000], value="%H:%M:%S\n%d%b%Y"),
+#                     dict(dtickrange=[60000, 3600000], value="%H:%M\n%d%b%Y"),
+#                     dict(dtickrange=[3600000, 86400000], value="%H:%M\n%d%b%Y"),
+#                     dict(dtickrange=[86400000, 604800000], value="%e\n%b %Y"),
+#                     dict(dtickrange=[604800000, "M1"], value="%b\n%Y"),
+#                     dict(dtickrange=["M1", "M12"], value="%b\n%Y"),
+#                     dict(dtickrange=["M12", None], value="%Y")
+#                 ]
+#         })
+#         figure.update_yaxes({'gridcolor': line_rgb,
+#                              'zeroline': True,
+#                              'zerolinecolor': line_rgb,
+#                              'showline': True,
+#                              'linewidth': 1,
+#                              'linecolor': line_rgb,
+#                              'mirror': True,
+#                              'tickfont': {'size': 14}
+#                              })
+#         figure.update_annotations(x=.01, font_size=22, xanchor='left', xref='x domain')
+        
+#         for bidx, bottom_title in enumerate(sub_plot_bottom_titles):
+#             figure.add_annotation(
+#                 xref='x domain',
+#                 yref='y domain',
+#                 xanchor='right',
+#                 yanchor='bottom',
+#                 x=1.0,
+#                 y=-.40,
+#                 font_size=18,
+#                 text=bottom_title,
+#                 showarrow=False,
+#                 row=(bidx+1), 
+#                 col=1,
+#                 bgcolor='rgba(255,255,255,.85)',
+#             )
+#             plot_legends = legends[bidx]
+#             for pli, leg_entry in enumerate(plot_legends):
+#                 figure.add_annotation(
+#                     xref='x domain',
+#                     yref='y domain',
+#                     xanchor='left',
+#                     x=0.01,
+#                     y=.95-(pli/10),
+#                     font_size=14,
+#                     font_color=px.colors.qualitative.Plotly[pli],
+#                     text=u'<b>\u23AF\u23AF\u23AF\u23AF</b>  '+leg_entry,
+#                     showarrow=False,
+#                     row=(bidx+1), 
+#                     col=1,
+#                     bgcolor='rgba(255,255,255,.85)',
+#                 )
+            
+#         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
+#         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
+#         query = query + '&lon=' + str(selected_json['lon'])
+#     return [row_style, plot_title, figure, list_group, query, '']
+
+
 @app.callback(
     [
         Output('plot-row', 'style'),
@@ -684,14 +913,10 @@ def update_selected_platform(click, initial_site):
     ], prevent_initial_call=True
 )
 def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, active_platforms, question_choice,):
-    figure = {}
-    query = ''
     row_style = {'display': 'block'}
-    plot_title = 'No data found.'
-    active = None
     list_group = html.Div()
     list_group.children = []
-    selected_platform = None
+    print('+_+_+_+_+_+_+_+ Starting plot callback...')
     if selection_data is not None:
         selected_json = json.loads(selection_data)
         if 'site_code' in selected_json:
@@ -708,53 +933,53 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         if to_plot.empty:
             return [row_style, plot_title, get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
         dids = to_plot['did'].to_list()
+        num_rows = len(dids)
         current_search = None
         for a_search in discover_json['discovery']:
             if a_search == question_choice:
                 current_search = discover_json['discovery'][a_search]
-        col = dbc.Col(width=12)
-        col.children = []
-        sub_plots = {}
+        figure = make_subplots(rows=num_rows, cols=1, row_heights=[450]*num_rows, shared_xaxes='all', shared_yaxes=False, subplot_titles=dids, vertical_spacing=(.275/num_rows))
+        dataset_idx = 0
         sub_plot_titles = []
         sub_plot_bottom_titles = []
-        legends = []
-        y_titles = []
-        row_h = []
-        p_idx = 0
+        if len(dids) == 2:
+            y_pos = y_pos_2.copy()
+            t_pos = t_pos_2.copy()
+        else:
+            y_pos = y_pos_1_4.copy()
+            t_pos = t_pos_1_4.copy()
         for p_did in dids:
             current_dataset = next(
                 (item for item in platform_json['config']['datasets'] if item['id'] == p_did), None)
             p_url = current_dataset['url']
-            row = dbc.Row()
-            card = dbc.Card()
-            card.children = [dbc.CardHeader(current_dataset['title'] + ' at ' + selected_platform)]
-            row.children = [card]
-            col.children.append(row)
             for search in current_search['search']:
                 link_group = dbc.ListGroup(horizontal=True)
                 link_group.children = []
                 for pd_data_url in search['datasets']:
-                    legend_members = []
                     if p_did in pd_data_url:
-                        list_group.children.append(link_group)
-                        if p_idx == 0:
-                            lgnd = 'legend'
-                            show_l = True
-                        else:
-                            lgnd = 'legend' + str(p_idx+1)
-                            show_l = False
-                        p_idx = p_idx + 1
-                        plot_title = 'Plot of ' + ','.join(search['short_names']) + ' at ' + selected_platform
-                        row_h.append(1/len(dids))
+                        dataset_idx = dataset_idx + 1
                         vlist = search['short_names'].copy()
-                        vlist.append('time')
-                        vlist.append('site_code')
-                        pvars = ','.join(vlist)
-                        meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform,
-                                                      href=p_url, target='_blank')
-                        link_group.children.append(meta_item)
+                        pvars = ','.join(vlist+['time', 'site_code'])
+                        plot_title = 'Plot of ' + ','.join(vlist) + ' at ' + selected_platform
                         p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
                         print('Making a plot of ' + p_url)
+                        df = pd.read_csv(p_url, skiprows=[1])
+                        sub_title = selected_platform
+                        bottom_title = current_dataset['title']
+                        if df.shape[0] > sub_sample_limit:
+                            df = plot_data.sample(n=sub_sample_limit).sort_values('time')
+                            sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
+                        sub_plot_titles.append(sub_title)
+                        sub_plot_bottom_titles.append(bottom_title)
+                        lines = px.line(df, x='time', y=vlist, template=None)
+                        legend_name = 'legend'
+                        if dataset_idx > 1:
+                            legend_name = 'legend' + str(dataset_idx)
+                        lines.update_traces(legend=legend_name)
+                        for fig in list(lines.select_traces()):
+                            figure.add_trace(fig, row=dataset_idx, col=1)
+                        meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform, href=current_dataset['url'], target='_blank')
+                        link_group.children.append(meta_item)
                         read_data = pd.read_csv(p_url, skiprows=[1])
                         item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
                         link_group.children.append(item)
@@ -762,60 +987,9 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                         link_group.children.append(item)
                         item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
                         link_group.children.append(item)
-                        read_data['site_code'] = read_data['site_code'].astype(str)
-                        read_data.loc[:, 'text_time'] = read_data['time'].astype(str)
-                        read_data.loc[:, 'time'] = pd.to_datetime(read_data['time'])
-                        plot_data = make_gaps(read_data, '1H')
-                        traces = []
-                        sub_title = selected_platform
-                        bottom_title = current_dataset['title']
-                        if plot_data.shape[0] > sub_sample_limit:
-                            plot_data = plot_data.sample(n=sub_sample_limit).sort_values('time')
-                            sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
-                        sub_plot_titles.append(sub_title)
-                        sub_plot_bottom_titles.append(bottom_title)
-                        plot_units = ''
-                        for vidx, p_var in enumerate(search['short_names']):
-                            legend_members.append(p_var)
-                            if p_var in units_by_did[p_did]:
-                                plot_units = '(' + units_by_did[p_did][p_var] + ')'
-                                y_titles.append(plot_units)
-                            plot_line_color = px.colors.qualitative.Plotly[vidx]
-                            plot_data['text'] = p_var + '<br>' + plot_data['text_time'] + '<br>' + plot_data[
-                                p_var].apply(lambda x: '{0:.2f}'.format(x))
-                            trace = go.Scattergl(x=plot_data['time'], y=plot_data[p_var],
-                                                 connectgaps=False,
-                                                 name=p_var,
-                                                 mode='lines',
-                                                 hovertext=plot_data['text'],
-                                                 marker={'color': plot_line_color,},
-                                                 hoverinfo="text",
-                                                 hoverlabel=dict(namelength=-1),
-                                                 showlegend=show_l,
-                                                 legend=lgnd,
-                                                 legendgroup=p_var
-                                                 )
-                            traces.append(trace)
-                        sub_plots[p_did] = traces
-                        legends.append(legend_members)
-        figure = make_subplots(rows=len(sub_plot_titles), cols=1, shared_xaxes='all', subplot_titles=sub_plot_titles,
-                               vertical_spacing=(.33/len(sub_plot_titles)),
-                               shared_yaxes=False,
-                               row_heights=row_h)
-        graph_height = height_of_row * len(sub_plot_titles)
-        for pidx, plt_did in enumerate(sub_plots):
-            p_traces = sub_plots[plt_did]
-            for p_trace in p_traces:
-                if pidx == 0:
-                    leg = 'legend'
-                else:
-                    leg = 'legend' + str(pidx+1)
-                figure.add_trace(p_trace, row=pidx+1, col=1)
-                figure.update_yaxes(title=y_titles[pidx], row=pidx+1, col=1)
-                ypos = 1.026 - pidx*(1.0/len(sub_plots))
-            figure['layout'].update({leg: {"yref":"paper", "y": ypos, "xref": "paper", "x": 1.026, "orientation": "v"}})
-        figure['layout'].update(height=graph_height, margin=dict(b=120))
-        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified',)
+                        list_group.children.append(link_group)
+        figure.update_layout(height=height_of_row*num_rows, showlegend=True)
+        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x',)
         figure.update_xaxes({
                 'ticklabelmode': 'period',
                 'showticklabels': True,
@@ -846,53 +1020,34 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                              'mirror': True,
                              'tickfont': {'size': 14}
                              })
-        # if len(sub_plot_titles[0]) < 10:
-        #     figure.update_annotations(x=.03, font_size=22)
-        # else:
-        #     figure.update_annotations(x=.2, font_size=22)
-        figure.update_annotations(x=.01, font_size=22, xanchor='left', xref='x domain')
-        # figure.update_layout(legend=dict(
-        #     yanchor="top",
-        #     y=0.99,
-        #     xanchor="left",
-        #     x=0.01,
-        #     orientation='v',
-        # ))
-        for bidx, bottom_title in enumerate(sub_plot_bottom_titles):
+        print('y_pos', y_pos)
+        print('t_pos', t_pos)
+        for l in range(0, len(dids)):
+            legend = 'legend'
+            if l > 0:
+                legend = legend + str(l+1)
+            lgnd = {legend:{'yref': 'paper', 'y': y_pos[l], 'xref': 'paper', 'x': .01}}
+            figure['layout'].update(lgnd)
+            print('title pos ', y_pos[l] + t_pos[l])
+            figure['layout']['annotations'][l].update({'text': sub_plot_titles[l], 'x': .0375, 'font_size': 22, 'y': y_pos[l] + t_pos[l]})
             figure.add_annotation(
                 xref='x domain',
                 yref='y domain',
                 xanchor='right',
                 yanchor='bottom',
                 x=1.0,
-                y=-.40,
+                y=-.246,
                 font_size=18,
-                text=bottom_title,
+                text=sub_plot_bottom_titles[l],
                 showarrow=False,
-                row=(bidx+1), 
+                row=(l+1), 
                 col=1,
                 bgcolor='rgba(255,255,255,.85)',
             )
-            plot_legends = legends[bidx]
-            for pli, leg_entry in enumerate(plot_legends):
-                figure.add_annotation(
-                    xref='x domain',
-                    yref='y domain',
-                    xanchor='left',
-                    x=0.01,
-                    y=.95-(pli/10),
-                    font_size=14,
-                    font_color=px.colors.qualitative.Plotly[pli],
-                    text=u'<b>\u23AF\u23AF\u23AF\u23AF</b>  '+leg_entry,
-                    showarrow=False,
-                    row=(bidx+1), 
-                    col=1,
-                    bgcolor='rgba(255,255,255,.85)',
-                )
-            
         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
         query = query + '&lon=' + str(selected_json['lon'])
+    print('=-=-=-=-=-=-=-=-=-=-=-=-=  Finished plotting...')                   
     return [row_style, plot_title, figure, list_group, query, '']
 
 
