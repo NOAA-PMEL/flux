@@ -1,6 +1,6 @@
 # Dash
 import dash
-from dash import Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL
+from dash import Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL, CeleryManager, DiskcacheManager
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -9,6 +9,7 @@ import plotly.express as px
 # pytyony stuff
 import os
 import sys
+import timeit
 
 # Standard tools and utilities
 import pandas as pd
@@ -19,10 +20,16 @@ import datetime
 import flask
 import urllib
 
+import diskcache
+
+import celery
+from celery import Celery
+from celery.schedules import crontab
+
 # My stuff
 from sdig.erddap.info import Info
 
-version = 'v1.5.1'  # Legends, title
+version = 'v1.5.3'  # units in the legend
 empty_color = '#999999'
 has_data_color = 'black'
 
@@ -132,14 +139,27 @@ for dataset in platform_json['config']['datasets']:
 
 time_marks = Info.get_time_marks(all_start_seconds, all_end_seconds)
 
+celery_app = Celery(broker=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"), backend=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
+if os.environ.get("DASH_ENTERPRISE_ENV") == "WORKSPACE":
+    # For testing...
+    # import diskcache
+    cache = diskcache.Cache("./cache")
+    background_callback_manager = DiskcacheManager(cache)
+else:
+    # For production...
+    background_callback_manager = CeleryManager(celery_app)
 
 app = dash.Dash(__name__,
                 external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP],
+                background_callback_manager=background_callback_manager,
                 )
 
 app._favicon = 'favicon.ico'
 app.title = 'Flux'
 server = app.server
+
+
+
 
 app.layout = \
     html.Div(
@@ -453,6 +473,7 @@ def record_map_change(relay_data):
     ], prevent_initial_call=True
 )
 def update_platform_state(in_start_date, in_end_date, in_data_question):
+    time0 = timeit.default_timer()
     time_constraint = ''
     all_with_data = None
     all_without_data = None
@@ -471,6 +492,7 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
             count_by = '1month'
         else:
             count_by = '1day'
+    time1 = timeit.default_timer()
     if in_data_question is not None and len(in_data_question) > 0:
         for qin in discover_json['discovery']:
             if qin == in_data_question:
@@ -552,14 +574,26 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                 all_without_data = pd.concat([all_without_data, locations_to_map])
     locations_with_data = json.dumps(pd.DataFrame(columns=['latitude', 'longitude', 'site_code', 'platform_color'], index=[0],).to_json())
     locations_without_data = json.dumps(pd.DataFrame(columns=['latitude', 'longitude', 'site_code', 'platform_color'], index=[0],).to_json())
+    time2 = timeit.default_timer()
     if all_with_data is not None:
         all_with_data.reset_index(inplace=True, drop=True)
         locations_with_data = json.dumps(all_with_data.to_json())
     if all_without_data is not None:
         all_without_data.reset_index(inplace=True, drop=True)
         locations_without_data = json.dumps(all_without_data.to_json())
+    time3 = timeit.default_timer()
+    # print('Total time: ' + convertSeconds(time3-time0))
+    # print('\tSetup dates: ' + convertSeconds(time1-time0))
+    # print('\tRead counts ERDDAP: ' + convertSeconds(time2-time1))
+    # print('\tReset Indexes: ' + convertSeconds(time3-time2))
     return [locations_with_data, locations_without_data, '']
 
+
+def convertSeconds(in_seconds):
+    seconds=int(in_seconds)%60
+    minutes=int(in_seconds/(60))%60
+    hours=int(in_seconds/(60*60))%24
+    return str(hours) + ":" + str(minutes) + ":" + str(seconds)
 
 @app.callback(
     [
@@ -574,6 +608,7 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
         State('map-info', 'data')
     ], prevent_initial_call=True)
 def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_platform, in_map):
+    tp0 = timeit.default_timer()
     center = {'lon': 0.0, 'lat': 0.0}
     zoom = 1.4
     if in_map is not None:
@@ -582,8 +617,10 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
         zoom = map_inf['zoom']
     location_map = go.Figure()
     selected_plat = None
+    tp1 = timeit.default_timer()
     if in_selected_platform is not None:
         selected_plat = json.loads(in_selected_platform)
+    tp2 = timeit.default_timer()
     if in_active_platforms is not None and in_inactive_platforms is not None:
         data_for_yes = pd.read_json(json.loads(in_active_platforms))
         data_for_no = pd.read_json(json.loads(in_inactive_platforms))
@@ -609,7 +646,7 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
             location_map.add_trace(no_trace)
         if yes_trace is not None:
             location_map.add_trace(yes_trace)
-
+    tp3 = timeit.default_timer()
     if selected_plat is not None and 'lat' in selected_plat and 'lon' in selected_plat and 'site_code' in selected_plat:
         yellow_trace = go.Scattermapbox(lat=[selected_plat['lat']],
                                         lon=[selected_plat['lon']],
@@ -619,6 +656,7 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
                                         marker={'color': 'yellow', 'size': 15},
                                         mode='markers')
         location_map.add_trace(yellow_trace)
+    tp4 = timeit.default_timer()
     location_map.update_layout(
         showlegend=False,
         mapbox_style="white-bg",
@@ -641,7 +679,14 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
         ),
         modebar_orientation='v',
     )
-
+    tp5 = timeit.default_timer()
+    # print('Make dot map:')
+    # print('\tTotal time: ' + convertSeconds(tp5 - tp0))
+    # print('\t\tRead map config: ' + convertSeconds(tp1 - tp0))
+    # print('\t\tRead platforms: ' + convertSeconds(tp2 - tp1))
+    # print('\t\tBlack/Grey Trace: ' + convertSeconds(tp3 - tp2))
+    # print('\t\tYellow dot: ' + convertSeconds(tp4 - tp3))
+    # print('\t\tMap config: ' + convertSeconds(tp5 - tp4))
     return [location_map]
 
 
@@ -671,228 +716,6 @@ def update_selected_platform(click, initial_site):
     return [selection]
 
 
-# @app.callback(
-#     [
-#         Output('plot-row', 'style'),
-#         Output('plot-card-title', 'children'),
-#         Output('plot-graph', 'figure'),
-#         Output('download-body', 'children'),
-#         Output('location', 'search'),
-#         Output('loading-div', 'children')
-#     ],
-#     [
-#         Input('selected-platform', 'data'),
-#         Input('start-date', 'value'),
-#         Input('end-date', 'value'),
-#         Input('active-platforms', 'data'),
-#     ],
-#     [
-#         State('radio-items', 'value'),
-#     ], prevent_initial_call=True
-# )
-# def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, active_platforms, question_choice,):
-#     figure = {}
-#     query = ''
-#     row_style = {'display': 'block'}
-#     plot_title = 'No data found.'
-#     active = None
-#     list_group = html.Div()
-#     list_group.children = []
-#     selected_platform = None
-#     if selection_data is not None:
-#         selected_json = json.loads(selection_data)
-#         if 'site_code' in selected_json:
-#             selected_platform = selected_json['site_code']
-#         else:
-#             raise dash.exceptions.PreventUpdate
-#     else:
-#         raise dash.exceptions.PreventUpdate
-#     if active_platforms is not None:
-#         active = pd.read_json(json.loads(active_platforms))
-#     if active is not None and selected_platform is not None:
-#         plot_time = '&time>='+plot_start_date+'&time<='+plot_end_date
-#         to_plot = active.loc[active['site_code'] == selected_platform]
-#         if to_plot.empty:
-#             return [row_style, plot_title, get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
-#         dids = to_plot['did'].to_list()
-#         current_search = None
-#         for a_search in discover_json['discovery']:
-#             if a_search == question_choice:
-#                 current_search = discover_json['discovery'][a_search]
-#         col = dbc.Col(width=12)
-#         col.children = []
-#         sub_plots = {}
-#         sub_plot_titles = []
-#         sub_plot_bottom_titles = []
-#         legends = []
-#         y_titles = []
-#         row_h = []
-#         p_idx = 0
-#         for p_did in dids:
-#             current_dataset = next(
-#                 (item for item in platform_json['config']['datasets'] if item['id'] == p_did), None)
-#             p_url = current_dataset['url']
-#             row = dbc.Row()
-#             card = dbc.Card()
-#             card.children = [dbc.CardHeader(current_dataset['title'] + ' at ' + selected_platform)]
-#             row.children = [card]
-#             col.children.append(row)
-#             for search in current_search['search']:
-#                 link_group = dbc.ListGroup(horizontal=True)
-#                 link_group.children = []
-#                 for pd_data_url in search['datasets']:
-#                     legend_members = []
-#                     if p_did in pd_data_url:
-#                         list_group.children.append(link_group)
-#                         if p_idx == 0:
-#                             lgnd = 'legend'
-#                             show_l = True
-#                         else:
-#                             lgnd = 'legend' + str(p_idx+1)
-#                             show_l = False
-#                         p_idx = p_idx + 1
-#                         plot_title = 'Plot of ' + ','.join(search['short_names']) + ' at ' + selected_platform
-#                         row_h.append(1/len(dids))
-#                         vlist = search['short_names'].copy()
-#                         vlist.append('time')
-#                         vlist.append('site_code')
-#                         pvars = ','.join(vlist)
-#                         meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform,
-#                                                       href=p_url, target='_blank')
-#                         link_group.children.append(meta_item)
-#                         p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
-#                         print('Making a plot of ' + p_url)
-#                         read_data = pd.read_csv(p_url, skiprows=[1])
-#                         item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
-#                         link_group.children.append(item)
-#                         item = dbc.ListGroupItem('.csv', href=p_url.replace('.htmlTable', '.csv'), target='_blank')
-#                         link_group.children.append(item)
-#                         item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
-#                         link_group.children.append(item)
-#                         read_data['site_code'] = read_data['site_code'].astype(str)
-#                         read_data.loc[:, 'text_time'] = read_data['time'].astype(str)
-#                         read_data.loc[:, 'time'] = pd.to_datetime(read_data['time'])
-#                         plot_data = make_gaps(read_data, '1H')
-#                         traces = []
-#                         sub_title = selected_platform
-#                         bottom_title = current_dataset['title']
-#                         if plot_data.shape[0] > sub_sample_limit:
-#                             plot_data = plot_data.sample(n=sub_sample_limit).sort_values('time')
-#                             sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
-#                         sub_plot_titles.append(sub_title)
-#                         sub_plot_bottom_titles.append(bottom_title)
-#                         plot_units = ''
-#                         for vidx, p_var in enumerate(search['short_names']):
-#                             legend_members.append(p_var)
-#                             if p_var in units_by_did[p_did]:
-#                                 plot_units = '(' + units_by_did[p_did][p_var] + ')'
-#                                 y_titles.append(plot_units)
-#                             plot_line_color = px.colors.qualitative.Plotly[vidx]
-#                             plot_data['text'] = p_var + '<br>' + plot_data['text_time'] + '<br>' + plot_data[
-#                                 p_var].apply(lambda x: '{0:.2f}'.format(x))
-#                             trace = go.Scattergl(x=plot_data['time'], y=plot_data[p_var],
-#                                                  connectgaps=False,
-#                                                  name=p_var,
-#                                                  mode='lines',
-#                                                  hovertext=plot_data['text'],
-#                                                  marker={'color': plot_line_color,},
-#                                                  hoverinfo="text",
-#                                                  hoverlabel=dict(namelength=-1),
-#                                                  showlegend=show_l,
-#                                                  legend=lgnd,
-#                                                  legendgroup=p_var
-#                                                  )
-#                             traces.append(trace)
-#                         sub_plots[p_did] = traces
-#                         legends.append(legend_members)
-#         figure = make_subplots(rows=len(sub_plot_titles), cols=1, shared_xaxes='all', subplot_titles=sub_plot_titles,
-#                                vertical_spacing=(.33/len(sub_plot_titles)),
-#                                shared_yaxes=False,
-#                                row_heights=row_h)
-#         graph_height = height_of_row * len(sub_plot_titles)
-#         for pidx, plt_did in enumerate(sub_plots):
-#             p_traces = sub_plots[plt_did]
-#             for p_trace in p_traces:
-#                 if pidx == 0:
-#                     leg = 'legend'
-#                 else:
-#                     leg = 'legend' + str(pidx+1)
-#                 figure.add_trace(p_trace, row=pidx+1, col=1)
-#                 figure.update_yaxes(title=y_titles[pidx], row=pidx+1, col=1)
-#                 ypos = 1.026 - pidx*(1.0/len(sub_plots))
-#             figure['layout'].update({leg: {"yref":"paper", "y": ypos, "xref": "paper", "x": 1.026, "orientation": "v"}})
-#         figure['layout'].update(height=graph_height, margin=dict(b=120))
-#         figure.update_layout(plot_bgcolor=plot_bg, hovermode='x unified',)
-#         figure.update_xaxes({
-#                 'ticklabelmode': 'period',
-#                 'showticklabels': True,
-#                 'gridcolor': line_rgb,
-#                 'zeroline': True,
-#                 'zerolinecolor': line_rgb,
-#                 'showline': True,
-#                 'linewidth': 1,
-#                 'linecolor': line_rgb,
-#                 'mirror': True,
-#                 'tickfont': {'size': 16},
-#                 'tickformatstops' : [
-#                     dict(dtickrange=[1000, 60000], value="%H:%M:%S\n%d%b%Y"),
-#                     dict(dtickrange=[60000, 3600000], value="%H:%M\n%d%b%Y"),
-#                     dict(dtickrange=[3600000, 86400000], value="%H:%M\n%d%b%Y"),
-#                     dict(dtickrange=[86400000, 604800000], value="%e\n%b %Y"),
-#                     dict(dtickrange=[604800000, "M1"], value="%b\n%Y"),
-#                     dict(dtickrange=["M1", "M12"], value="%b\n%Y"),
-#                     dict(dtickrange=["M12", None], value="%Y")
-#                 ]
-#         })
-#         figure.update_yaxes({'gridcolor': line_rgb,
-#                              'zeroline': True,
-#                              'zerolinecolor': line_rgb,
-#                              'showline': True,
-#                              'linewidth': 1,
-#                              'linecolor': line_rgb,
-#                              'mirror': True,
-#                              'tickfont': {'size': 14}
-#                              })
-#         figure.update_annotations(x=.01, font_size=22, xanchor='left', xref='x domain')
-        
-#         for bidx, bottom_title in enumerate(sub_plot_bottom_titles):
-#             figure.add_annotation(
-#                 xref='x domain',
-#                 yref='y domain',
-#                 xanchor='right',
-#                 yanchor='bottom',
-#                 x=1.0,
-#                 y=-.40,
-#                 font_size=18,
-#                 text=bottom_title,
-#                 showarrow=False,
-#                 row=(bidx+1), 
-#                 col=1,
-#                 bgcolor='rgba(255,255,255,.85)',
-#             )
-#             plot_legends = legends[bidx]
-#             for pli, leg_entry in enumerate(plot_legends):
-#                 figure.add_annotation(
-#                     xref='x domain',
-#                     yref='y domain',
-#                     xanchor='left',
-#                     x=0.01,
-#                     y=.95-(pli/10),
-#                     font_size=14,
-#                     font_color=px.colors.qualitative.Plotly[pli],
-#                     text=u'<b>\u23AF\u23AF\u23AF\u23AF</b>  '+leg_entry,
-#                     showarrow=False,
-#                     row=(bidx+1), 
-#                     col=1,
-#                     bgcolor='rgba(255,255,255,.85)',
-#                 )
-            
-#         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
-#         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
-#         query = query + '&lon=' + str(selected_json['lon'])
-#     return [row_style, plot_title, figure, list_group, query, '']
-
-
 @app.callback(
     [
         Output('plot-row', 'style'),
@@ -910,13 +733,14 @@ def update_selected_platform(click, initial_site):
     ],
     [
         State('radio-items', 'value'),
-    ], prevent_initial_call=True
+    ], prevent_initial_call=True, background=True
 )
 def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, active_platforms, question_choice,):
+    p0 = timeit.default_timer()
     row_style = {'display': 'block'}
     list_group = html.Div()
     list_group.children = []
-    print('+_+_+_+_+_+_+_+ Starting plot callback...')
+    # print('+_+_+_+_+_+_+_+ Starting plot callback...')
     if selection_data is not None:
         selected_json = json.loads(selection_data)
         if 'site_code' in selected_json:
@@ -927,6 +751,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         raise dash.exceptions.PreventUpdate
     if active_platforms is not None:
         active = pd.read_json(json.loads(active_platforms))
+    p1 = timeit.default_timer()
     if active is not None and selected_platform is not None:
         plot_time = '&time>='+plot_start_date+'&time<='+plot_end_date
         to_plot = active.loc[active['site_code'] == selected_platform]
@@ -948,6 +773,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         else:
             y_pos = y_pos_1_4.copy()
             t_pos = t_pos_1_4.copy()
+        p2 = timeit.default_timer()
         for p_did in dids:
             current_dataset = next(
                 (item for item in platform_json['config']['datasets'] if item['id'] == p_did), None)
@@ -967,17 +793,25 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                         sub_title = selected_platform
                         bottom_title = current_dataset['title']
                         if df.shape[0] > sub_sample_limit:
-                            df = plot_data.sample(n=sub_sample_limit).sort_values('time')
+                            df = df.sample(n=sub_sample_limit).sort_values('time')
                             sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
                         sub_plot_titles.append(sub_title)
                         sub_plot_bottom_titles.append(bottom_title)
-                        lines = px.line(df, x='time', y=vlist, template=None)
+                        l_labels = []
+                        for n, v in enumerate(vlist):
+                            if v in units_by_did[p_did]:
+                                l_labels.append(v + ' (' + units_by_did[p_did][v] + ')')
+                            else:
+                                l_labels.append(v)
+                        lines = px.line(df, x='time', y=vlist, labels=l_labels)
                         legend_name = 'legend'
                         if dataset_idx > 1:
                             legend_name = 'legend' + str(dataset_idx)
                         lines.update_traces(legend=legend_name)
-                        for fig in list(lines.select_traces()):
-                            figure.add_trace(fig, row=dataset_idx, col=1)
+                        for ifig, fig in enumerate(list(lines.select_traces())):
+                            nfig = go.Figure(fig)
+                            nfig.update_traces(name=l_labels[ifig])
+                            figure.add_trace(list(nfig.select_traces())[0], row=dataset_idx, col=1)
                         meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform, href=current_dataset['url'], target='_blank')
                         link_group.children.append(meta_item)
                         read_data = pd.read_csv(p_url, skiprows=[1])
@@ -988,6 +822,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                         item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
                         link_group.children.append(item)
                         list_group.children.append(link_group)
+        p3 = timeit.default_timer()
         figure.update_layout(height=height_of_row*num_rows, showlegend=True)
         figure.update_layout(plot_bgcolor=plot_bg, hovermode='x',)
         figure.update_xaxes({
@@ -1018,17 +853,17 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                              'linewidth': 1,
                              'linecolor': line_rgb,
                              'mirror': True,
-                             'tickfont': {'size': 14}
+                             'tickfont': {'size': 16}
                              })
-        print('y_pos', y_pos)
-        print('t_pos', t_pos)
+        # print('y_pos', y_pos)
+        # print('t_pos', t_pos)
         for l in range(0, len(dids)):
             legend = 'legend'
             if l > 0:
                 legend = legend + str(l+1)
             lgnd = {legend:{'yref': 'paper', 'y': y_pos[l], 'xref': 'paper', 'x': .01}}
             figure['layout'].update(lgnd)
-            print('title pos ', y_pos[l] + t_pos[l])
+            # print('title pos ', y_pos[l] + t_pos[l])
             figure['layout']['annotations'][l].update({'text': sub_plot_titles[l], 'x': .0375, 'font_size': 22, 'y': y_pos[l] + t_pos[l]})
             figure.add_annotation(
                 xref='x domain',
@@ -1047,7 +882,13 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
         query = query + '&lon=' + str(selected_json['lon'])
-    print('=-=-=-=-=-=-=-=-=-=-=-=-=  Finished plotting...')                   
+    p4 = timeit.default_timer()
+    # print('=-=-=-=-=-=-=-=-=-=-=-=-=  Finished plotting...')    
+    # print('\tTotal time: ' + convertSeconds(p4-p0))
+    # print('\t\tSet up, read platform: ' + convertSeconds(p1-p0))
+    # print('\t\tSubplot setup: ' + convertSeconds(p2-p1))
+    # print('\t\tRead data and plot: ' + convertSeconds(p3-p2))
+    # print('\t\tSet plot options: ' + convertSeconds(p4 -p3))               
     return [row_style, plot_title, figure, list_group, query, '']
 
 
