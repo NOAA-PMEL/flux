@@ -1,10 +1,10 @@
 # Dash
-import dash
-from dash import Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL, CeleryManager, DiskcacheManager
+from dash import dash, Dash, callback, html, dcc, dash_table, Input, Output, State, MATCH, ALL, CeleryManager, DiskcacheManager, ctx, exceptions
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
+import dash_design_kit as ddk
 
 # pytyony stuff
 import os
@@ -29,7 +29,7 @@ from celery.schedules import crontab
 # My stuff
 from sdig.erddap.info import Info
 
-version = 'v1.5.3'  # units in the legend
+version = 'v1.5.4'  # ddk.Graph for best fonts and layout
 empty_color = '#999999'
 has_data_color = 'black'
 
@@ -48,9 +48,11 @@ have_data_url = 'https://data.pmel.noaa.gov/pmel/erddap/tabledap'
 
 y_pos_1_4 = [.999, .73225, .447, 0.161]
 t_pos_1_4 = [.0005, .0005, .018, .036]
+x_pos_1_4 = [.1, .01, .01, .01]
 
-y_pos_2 = [.999, .390]
+y_pos_2 = [.999, .4112]
 t_pos_2 = [.0005, .048]
+x_pos_2 = [.095, .011]
 
 discover_error = '''
 You must configure a DISDOVERY_JSON env variable pointing to the JSON file that defines the which collections
@@ -296,7 +298,7 @@ app.layout = \
                         dbc.CardHeader(id='plot-card-title'),
                         dbc.CardBody(id='plot-card-body', children=[
                             dcc.Loading(
-                                dcc.Graph(id='plot-graph', config=graph_config)
+                                ddk.Graph(id='plot-graph', config=graph_config)
                             )
                         ])
                     ])
@@ -701,7 +703,6 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
 )
 def update_selected_platform(click, initial_site):
     selection = None
-    ctx = dash.callback_context
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger_id == 'initial-site':
         selection = initial_site
@@ -746,9 +747,9 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         if 'site_code' in selected_json:
             selected_platform = selected_json['site_code']
         else:
-            raise dash.exceptions.PreventUpdate
+            raise exceptions.PreventUpdate
     else:
-        raise dash.exceptions.PreventUpdate
+        raise exceptions.PreventUpdate
     if active_platforms is not None:
         active = pd.read_json(json.loads(active_platforms))
     p1 = timeit.default_timer()
@@ -770,9 +771,11 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         if len(dids) == 2:
             y_pos = y_pos_2.copy()
             t_pos = t_pos_2.copy()
+            x_pos = x_pos_2.copy()
         else:
             y_pos = y_pos_1_4.copy()
             t_pos = t_pos_1_4.copy()
+            x_pos = x_pos_1_4.copy()
         p2 = timeit.default_timer()
         for p_did in dids:
             current_dataset = next(
@@ -823,8 +826,8 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                         link_group.children.append(item)
                         list_group.children.append(link_group)
         p3 = timeit.default_timer()
-        figure.update_layout(height=height_of_row*num_rows, showlegend=True)
-        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x',)
+        figure.update_layout(height=height_of_row*num_rows)
+        figure.update_layout(plot_bgcolor=plot_bg, hovermode='x', paper_bgcolor='white', margin=dict(l=80, r=80, b=80, t=80, ))
         figure.update_xaxes({
                 'ticklabelmode': 'period',
                 'showticklabels': True,
@@ -861,7 +864,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
             legend = 'legend'
             if l > 0:
                 legend = legend + str(l+1)
-            lgnd = {legend:{'yref': 'paper', 'y': y_pos[l], 'xref': 'paper', 'x': .01}}
+            lgnd = {legend:{'yref': 'paper', 'y': y_pos[l], 'xref': 'paper', 'x': x_pos[l], 'orientation': 'v', 'bgcolor': 'white'}}
             figure['layout'].update(lgnd)
             # print('title pos ', y_pos[l] + t_pos[l])
             figure['layout']['annotations'][l].update({'text': sub_plot_titles[l], 'x': .0375, 'font_size': 22, 'y': y_pos[l] + t_pos[l]})
@@ -872,7 +875,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
                 yanchor='bottom',
                 x=1.0,
                 y=-.246,
-                font_size=18,
+                font_size=22,
                 text=sub_plot_bottom_titles[l],
                 showarrow=False,
                 row=(l+1), 
@@ -907,7 +910,6 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
     ], prevent_initial_call=True
 )
 def set_date_range_from_slider(slide_values, in_start_date, in_end_date, initial_start, initial_end):
-    ctx = dash.callback_context
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
     if trigger_id == 'initial-time-start' or trigger_id == 'initial-time-end':
         start_output = initial_start
@@ -926,12 +928,11 @@ def set_date_range_from_slider(slide_values, in_start_date, in_end_date, initial
 
     else:
         if slide_values is None:
-            raise dash.exceptions.PreventUpdate
+            raise exceptions.PreventUpdate
 
         range_min = all_start_seconds
         range_max = all_end_seconds
 
-        ctx = dash.callback_context
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         start_seconds = slide_values[0]
