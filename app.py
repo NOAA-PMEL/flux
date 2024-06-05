@@ -287,7 +287,7 @@ app.layout = \
                             dcc.Loading(html.Div(id='map-loading'))
                         ]),
                         dbc.CardBody(
-                            dcc.Graph(id='location-map', config=graph_config),
+                            ddk.Graph(id='location-map', config=graph_config),
                         )
                     ])
                 ])
