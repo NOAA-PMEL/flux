@@ -10,6 +10,7 @@ import dash_design_kit as ddk
 import os
 import sys
 import timeit
+from urllib.parse import quote
 
 # Standard tools and utilities
 import pandas as pd
@@ -454,10 +455,10 @@ def record_map_change(relay_data):
     center = {'lon': 0.0, 'lat': 0.0}
     zoom = 1.4
     if relay_data is not None:
-        if 'mapbox.center' in relay_data:
-            center = relay_data['mapbox.center']
-        if 'mapbox.zoom' in relay_data:
-            zoom = relay_data['mapbox.zoom']
+        if 'map.center' in relay_data:
+            center = relay_data['map.center']
+        if 'map.zoom' in relay_data:
+            zoom = relay_data['map.zoom']
     map_info = {'center': center, 'zoom': zoom}
     return [json.dumps(map_info)]
 
@@ -496,10 +497,14 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
             count_by = '1day'
     time1 = timeit.default_timer()
     if in_data_question is not None and len(in_data_question) > 0:
+        print('data question', in_data_question)
         for qin in discover_json['discovery']:
+            print('qin', qin)
             if qin == in_data_question:
+                print('looking for data', in_data_question)
                 search_params = discover_json['discovery'][qin]['search']
                 for search in search_params:
+                    print('searching ', search)
                     vars_to_get = search['short_names'].copy()
                     vars_to_get.append('time')
                     vars_to_get.append('site_code')
@@ -513,12 +518,14 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                                                         dtype={'site_code': str,
                                                                'latitude': np.float64,
                                                                'longitude': np.float64})
-                        have_url = dataset_to_check + '.csv?' + short_names + time_constraint
+                        have_url = dataset_to_check + '.csv?' + short_names + quote(time_constraint)
+                        # DEBUG print('have url', have_url)
                         have = None
                         try:
                             have = pd.read_csv(have_url, skiprows=[1])
-                        except:
+                        except Exception as e:
                             pass
+                        # DEBUG print('have df', have)
                         if have is not None:
                             csum = have.groupby(['site_code']).sum().reset_index()
                             csum['site_code'] = csum['site_code'].astype(str)
@@ -538,6 +545,7 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                                 criteria = 'csum[(' + criteria + ')]'
                                 # eval dereferences all the stuff in the string and runs it
                                 sum_n = pd.eval(criteria)
+                            # DEBUG print('sum of counts', sum_n)
                             if sum_n is not None and sum_n.shape[0] > 0:
                                 # sum_n is the platforms that have data.
                                 # This merge operation (as explained here:
@@ -547,6 +555,7 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                                 # that can be plotted.
                                 some_data = locations_to_map.merge(sum_n, on='site_code', how='inner')
                                 some_data['platform_color'] = has_data_color
+                                print('found some data', some_data)
                                 if all_with_data is None:
                                     all_with_data = some_data
                                 else:
@@ -579,6 +588,7 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
     time2 = timeit.default_timer()
     if all_with_data is not None:
         all_with_data.reset_index(inplace=True, drop=True)
+        # DEBUG print('saving non-empty data:', all_with_data)
         locations_with_data = json.dumps(all_with_data.to_json())
     if all_without_data is not None:
         all_without_data.reset_index(inplace=True, drop=True)
@@ -625,10 +635,11 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
     tp2 = timeit.default_timer()
     if in_active_platforms is not None and in_inactive_platforms is not None:
         data_for_yes = pd.read_json(json.loads(in_active_platforms))
+        # DEBUG print(data_for_yes)
         data_for_no = pd.read_json(json.loads(in_inactive_platforms))
         no_trace = None
         if data_for_no.shape[0] > 0:
-            no_trace = go.Scattermapbox(lat=data_for_no['latitude'],
+            no_trace = go.Scattermap(lat=data_for_no['latitude'],
                                         lon=data_for_no['longitude'],
                                         hovertext=data_for_no['site_code'],
                                         hoverinfo='lat+lon+text',
@@ -637,7 +648,7 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
                                         mode='markers')
         yes_trace = None
         if data_for_yes.shape[0] > 0:
-            yes_trace = go.Scattermapbox(lat=data_for_yes['latitude'],
+            yes_trace = go.Scattermap(lat=data_for_yes['latitude'],
                                          lon=data_for_yes['longitude'],
                                          hovertext=data_for_yes['site_code'],
                                          hoverinfo='lat+lon+text',
@@ -648,9 +659,10 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
             location_map.add_trace(no_trace)
         if yes_trace is not None:
             location_map.add_trace(yes_trace)
+
     tp3 = timeit.default_timer()
     if selected_plat is not None and 'lat' in selected_plat and 'lon' in selected_plat and 'site_code' in selected_plat:
-        yellow_trace = go.Scattermapbox(lat=[selected_plat['lat']],
+        yellow_trace = go.Scattermap(lat=[selected_plat['lat']],
                                         lon=[selected_plat['lon']],
                                         hovertext=[selected_plat['site_code']],
                                         hoverinfo='lat+lon+text',
@@ -661,19 +673,19 @@ def make_location_map(in_active_platforms, in_inactive_platforms, in_selected_pl
     tp4 = timeit.default_timer()
     location_map.update_layout(
         showlegend=False,
-        mapbox_style="white-bg",
-        mapbox_layers=[
+        map_style="white-bg",
+        map_layers=[
             {
                 "below": 'traces',
                 "sourcetype": "raster",
-                "sourceattribution": "Powered by Esri",
+                "sourceattribution": "&nbsp;GEBCO &amp; NCEI&nbsp;",
                 "source": [
-                    "https://ibasemaps-api.arcgis.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}?token=" + ESRI_API_KEY
+                    'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}'
                 ]
             }
         ],
-        mapbox_zoom=zoom,
-        mapbox_center=center,
+        map_zoom=zoom,
+        map_center=center,
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
         legend=dict(
             orientation="v",
@@ -757,7 +769,7 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         plot_time = '&time>='+plot_start_date+'&time<='+plot_end_date
         to_plot = active.loc[active['site_code'] == selected_platform]
         if to_plot.empty:
-            return [row_style, plot_title, get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
+            return [row_style, "", get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
         dids = to_plot['did'].to_list()
         num_rows = len(dids)
         current_search = None
@@ -992,4 +1004,4 @@ def set_date_range_from_slider(slide_values, in_start_date, in_end_date, initial
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run(debug=True)

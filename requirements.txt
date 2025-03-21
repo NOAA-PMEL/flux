@@ -3,7 +3,7 @@ dash>=2.5
 gunicorn
 pandas
 dash_bootstrap_components
-plotly>=5.18.0
+plotly>=6.0.1
 diskcache
 psutil
 multiprocess

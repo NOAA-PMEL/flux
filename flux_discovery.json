@@ -8,12 +8,12 @@
             "short_names": ["TAUX","TAUY"],
             "standard_names": ["surface_downward_eastward_stress","surface_downward_northward_stress"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_papa_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux"
             ]
           },
           {
@@ -21,7 +21,7 @@
             "short_names": ["TAUE","TAUN"],
             "standard_name": ["surface_downward_eastward_stress","surface_downward_northward_stress"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
             ]
           }
       ]
@@ -34,10 +34,10 @@
             "short_names": ["QNET"],
             "standard_names": ["surface_net_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
-              "https://data.pmel.noaa.gov/generic/erddap/tabledap/ocs_papa_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux"
             ]
           },
           {
@@ -45,7 +45,7 @@
             "short_names": ["QN"],
             "standard_names": ["surface_net_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
             ]
           }
       ]
@@ -58,12 +58,12 @@
             "short_names": ["QLAT", "QSEN"],
             "standard_names":["surface_upward_latent_heat_flux", "surface_upward_sensible_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_papa_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux"
             ]
           },
           {
@@ -71,7 +71,7 @@
             "short_names": ["QL", "QS"],
             "standard_names":["surface_upward_latent_heat_flux", "surface_upward_sensible_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
             ]
           }
         ]
@@ -84,13 +84,13 @@
             "short_names": ["RAIN"],
             "standard_names": ["rainfall_rate"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_papa_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
             ]
           }
         ]
@@ -103,13 +103,13 @@
             "short_names": ["RAIN", "EVAP"],
             "standard_names": ["rainfall_rate", "surface_water_evaporation_rate"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_relative",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_absolute",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_papa_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_absolute",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux",
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
             ]
           }
         ]
