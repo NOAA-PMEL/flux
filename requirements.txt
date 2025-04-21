@@ -11,4 +11,5 @@ celery
 redis
 SQLAlchemy
 pg8000
+psycopg2
 git+https://github.com/noaaroland/sdig.git
