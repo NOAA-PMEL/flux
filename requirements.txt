@@ -9,4 +9,5 @@ psutil
 multiprocess
 celery
 redis
+SQLAlchemy
 git+https://github.com/noaaroland/sdig.git

@@ -22,6 +22,7 @@ import flask
 import urllib
 
 import diskcache
+import constants
 
 import celery
 from celery import Celery
@@ -30,8 +31,8 @@ from celery.schedules import crontab
 # My stuff
 from sdig.erddap.info import Info
 
-version = 'v1.5.4'  # ddk.Graph for best fonts and layout
-empty_color = '#999999'
+version = 'v2.1'  # database for counts and which platforms are in which ERDDAP data set
+empty_color = '#AAAAAA'
 has_data_color = 'black'
 
 month_step = 60*60*24*30.25
@@ -43,9 +44,6 @@ line_rgb = 'rgba(.04,.04,.04,.2)'
 plot_bg = 'rgba(1.0, 1.0, 1.0 ,1.0)'
 
 sub_sample_limit = 88000
-
-have_data_url = 'https://data.pmel.noaa.gov/pmel/erddap/tabledap'
-
 
 y_pos_1_4 = [.999, .73225, .447, 0.161]
 t_pos_1_4 = [.0005, .0005, .018, .036]
@@ -69,39 +67,6 @@ graph_config = {'displaylogo': False, 'modeBarButtonsToRemove': ['select2d', 'la
 platform_file = 'oceansites_flux_list.json'
 if platform_file is None:
     platform_file = os.getenv('PLATFORMS_JSON')
-
-platform_json = None
-if platform_file is not None:
-    with open(platform_file) as platform_stream:
-        platform_json = json.load(platform_stream)
-
-variables_by_did = {}
-locations_by_did = {}
-units_by_did = {}
-
-for dataset in platform_json['config']['datasets']:
-    url = dataset['url']
-    locations_url = dataset['locations']
-    did = url[url.rindex('/') + 1:]
-    dataset['id'] = did
-    info = Info(url)
-    title = info.get_title()
-    dataset['title'] = title
-    variables_list, long_names, units, standard_names, d_types = info.get_variables()
-    units_by_did[did] = units
-    variables_by_did[did] = variables_list
-    mdf = pd.read_csv(locations_url, skiprows=[1],
-                      dtype={'wmo_platform_code': str, 'site_code': str, 'latitude': np.float64, 'longitude': np.float64})
-    mdf['did'] = did
-    if mdf.shape[0] > 1 and mdf.site_code.nunique() <= 1:
-        adf = mdf.mean(axis=0, numeric_only=True)
-        adf['site_code'] = mdf['site_code'].iloc[0]
-        mdf = pd.DataFrame(columns=['latitude', 'longitude', 'site_code'], index=[0], )
-        mdf['latitude'] = adf.loc['latitude']
-        mdf['longitude'] = adf.loc['longitude']
-        mdf['site_code'] = adf.loc['site_code']
-        mdf['wmo_platform_code'] = adf.loc['wmo_platform_code']
-    locations_by_did[did] = json.dumps(mdf.to_json())
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -129,18 +94,16 @@ all_end = None
 all_start_seconds = 999999999999999
 all_end_seconds = -999999999999999
 
-for dataset in platform_json['config']['datasets']:
-    url = dataset['url']
-    my_info = Info(url)
-    start_date, end_date, start_date_seconds, end_date_seconds = my_info.get_times()
-    if start_date_seconds < all_start_seconds:
-        all_start_seconds = start_date_seconds
-        all_start = start_date
-    if end_date_seconds > all_end_seconds:
-        all_end_seconds = end_date_seconds
-        all_end = end_date
+with constants.postgres_engine.connect() as conn:
+    times = pd.read_sql(f'SELECT MIN(start_date_seconds) as mins, MAX(end_date_seconds) maxs, MIN(start_date) as mind, MAX(end_date) as maxd from metadata', con=conn)
 
+all_start_seconds = times['mins'].values[0]
+all_end_seconds = times['maxs'].values[0]
 time_marks = Info.get_time_marks(all_start_seconds, all_end_seconds)
+
+all_start = times['mind'].values[0]
+all_end = times['maxd'].values[0]
+
 
 celery_app = Celery(broker=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"), backend=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"))
 if os.environ.get("DASH_ENTERPRISE_ENV") == "WORKSPACE":
@@ -160,9 +123,6 @@ app = dash.Dash(__name__,
 app._favicon = 'favicon.ico'
 app.title = 'Flux'
 server = app.server
-
-
-
 
 app.layout = \
     html.Div(
@@ -484,11 +444,11 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
     if in_start_date is not None and in_end_date is not None:
         n_start_obj = datetime.datetime.strptime(in_start_date, d_format)
         n_start_obj.replace(day=1, hour=0)
-        time_constraint = time_constraint + '&time>=' + n_start_obj.isoformat()
+        time_constraint = time_constraint + "time>='" + n_start_obj.isoformat() + "'"
 
         n_end_obj = datetime.datetime.strptime(in_end_date, d_format)
         n_end_obj.replace(day=1, hour=0)
-        time_constraint = time_constraint + '&time<=' + n_end_obj.isoformat()
+        time_constraint = time_constraint + " AND time<='" + n_end_obj.isoformat() + "'"
         if n_start_obj.year != n_end_obj.year:
             count_by = '1year'
         elif n_start_obj.year == n_end_obj.year and n_start_obj.month != n_end_obj.month:
@@ -499,90 +459,75 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
     if in_data_question is not None and len(in_data_question) > 0:
         print('data question', in_data_question)
         for qin in discover_json['discovery']:
-            print('qin', qin)
             if qin == in_data_question:
-                print('looking for data', in_data_question)
                 search_params = discover_json['discovery'][qin]['search']
                 for search in search_params:
-                    print('searching ', search)
-                    vars_to_get = search['short_names'].copy()
+                    vars_to_get = ['"'+short+'"' for short in search['short_names']]
+                    read_dtypes = {}
+                    for short in search['short_names']:
+                        read_dtypes[short] = np.float64
                     vars_to_get.append('time')
                     vars_to_get.append('site_code')
-                    short_names = ','.join(vars_to_get)
-                    # join_type == "or" then sum of short name columns > 0.
-                    # join_type == "and" then s1 > 0 && s2 > 0 ...
                     join_type = search['join']
-                    for dataset_to_check in search['datasets']:
-                        cur_did = dataset_to_check[dataset_to_check.rindex('/')+1:]
-                        locations_to_map = pd.read_json(json.loads(locations_by_did[cur_did]),
-                                                        dtype={'site_code': str,
-                                                               'latitude': np.float64,
-                                                               'longitude': np.float64})
-                        have_url = dataset_to_check + '.csv?' + short_names + quote(time_constraint)
-                        # DEBUG print('have url', have_url)
-                        have = None
-                        try:
-                            have = pd.read_csv(have_url, skiprows=[1])
-                        except Exception as e:
-                            pass
-                        # DEBUG print('have df', have)
-                        if have is not None:
-                            csum = have.groupby(['site_code']).sum().reset_index()
-                            csum['site_code'] = csum['site_code'].astype(str)
-                            sum_n = None
-                            if join_type == 'or':
-                                csum['has_data'] = csum[search['short_names']].sum(axis=1)
-                                csum = csum.sort_values('site_code')
-                                locations_to_map = locations_to_map.sort_values('site_code')
-                                sum_n = csum.loc[csum['has_data'] > 0]
-                            if join_type == 'and':
-                                chk_vars = search['short_names']
-                                criteria = ''
-                                for vix, v in enumerate(chk_vars):
-                                    if vix > 0:
-                                        criteria = criteria + ' & '
-                                    criteria = criteria + '(csum[\'' + v + '\']' + ' > 0)'
-                                criteria = 'csum[(' + criteria + ')]'
-                                # eval dereferences all the stuff in the string and runs it
-                                sum_n = pd.eval(criteria)
-                            # DEBUG print('sum of counts', sum_n)
-                            if sum_n is not None and sum_n.shape[0] > 0:
-                                # sum_n is the platforms that have data.
-                                # This merge operation (as explained here:
-                                # https://stackoverflow.com/questions/53645882/pandas-merging-101/53645883#53645883)
-                                # combines the locations data frame with
-                                # the information about which sites have observations to make something
-                                # that can be plotted.
-                                some_data = locations_to_map.merge(sum_n, on='site_code', how='inner')
-                                some_data['platform_color'] = has_data_color
-                                print('found some data', some_data)
-                                if all_with_data is None:
-                                    all_with_data = some_data
-                                else:
-                                    all_with_data = pd.concat([all_with_data, some_data])
-                                criteria = locations_to_map.site_code.isin(some_data.site_code) == False
-                                no_data = locations_to_map.loc[criteria].reset_index()
-                                no_data['platform_color'] = empty_color
-                                if all_without_data is None:
-                                    all_without_data = no_data
-                                else:
-                                    all_without_data = pd.concat([all_without_data, no_data])
-                        else:
-                            locations_to_map['platform_color'] = empty_color
-                            if all_without_data is None:
-                                all_without_data = locations_to_map
+                    locations_to_map = None
+                    with constants.postgres_engine.connect() as conn:
+                        locations_to_map = pd.read_sql(f'SELECT * from locations', con=conn)
+                    var_list = ','.join(vars_to_get)
+                    with constants.postgres_engine.connect() as conn:
+                        have = pd.read_sql(f'SELECT {var_list} FROM nobs WHERE {time_constraint}', con=conn, dtype=read_dtypes)
+                    if have is not None:
+                        csum = have.groupby(['site_code']).sum().reset_index()
+                        csum['site_code'] = csum['site_code'].astype(str)
+                        sum_n = None
+                        if join_type == 'or':
+                            csum['has_data'] = csum[search['short_names']].sum(axis=1)
+                            csum = csum.sort_values('site_code')
+                            locations_to_map = locations_to_map.sort_values('site_code')
+                            sum_n = csum.loc[csum['has_data'] > 0]
+                        if join_type == 'and':
+                            chk_vars = search['short_names']
+                            criteria = ''
+                            for vix, v in enumerate(chk_vars):
+                                if vix > 0:
+                                    criteria = criteria + ' & '
+                                criteria = criteria + '(csum[\'' + v + '\']' + ' > 0)'
+                            criteria = 'csum[(' + criteria + ')]'
+                            # eval dereferences all the stuff in the string and runs it
+                            sum_n = pd.eval(criteria)
+                        # DEBUG print('sum of counts')
+                        # DEBUG print(sum_n)
+                        if sum_n is not None and sum_n.shape[0] > 0:
+                            # sum_n is the platforms that have data.
+                            # This merge operation (as explained here:
+                            # https://stackoverflow.com/questions/53645882/pandas-merging-101/53645883#53645883)
+                            # combines the locations data frame with
+                            # the information about which sites have observations to make something
+                            # that can be plotted.
+                            some_data = locations_to_map.merge(sum_n, on='site_code', how='inner')
+                            some_data['platform_color'] = has_data_color
+                            if all_with_data is None:
+                                all_with_data = some_data
                             else:
-                                all_without_data = pd.concat([all_without_data, locations_to_map])
+                                all_with_data = pd.concat([all_with_data, some_data])
+                            criteria = locations_to_map.site_code.isin(some_data.site_code) == False
+                            no_data = locations_to_map.loc[criteria].reset_index()
+                            no_data['platform_color'] = empty_color
+                            if all_without_data is None:
+                                all_without_data = no_data
+                            else:
+                                all_without_data = pd.concat([all_without_data, no_data])
+                    else:
+                        locations_to_map['platform_color'] = empty_color
+                        if all_without_data is None:
+                            all_without_data = locations_to_map
+                        else:
+                            all_without_data = pd.concat([all_without_data, locations_to_map])
     else:
-        for map_did in locations_by_did:
-            locations_to_map = pd.read_json(json.loads(locations_by_did[map_did]),
-                                            dtype={'wmo_platform_code': str, 'site_code': str, 'latitude': np.float64, 'longitude': np.float64})
+        # Everything is empty at the start
+        with constants.postgres_engine.connect() as conn:
+            all_without_data = pd.read_sql(f'SELECT * from locations', con=conn)
+        all_without_data['platform_color'] = empty_color
 
-            locations_to_map['platform_color'] = empty_color
-            if all_without_data is None:
-                all_without_data = locations_to_map
-            else:
-                all_without_data = pd.concat([all_without_data, locations_to_map])
     locations_with_data = json.dumps(pd.DataFrame(columns=['latitude', 'longitude', 'site_code', 'platform_color'], index=[0],).to_json())
     locations_without_data = json.dumps(pd.DataFrame(columns=['latitude', 'longitude', 'site_code', 'platform_color'], index=[0],).to_json())
     time2 = timeit.default_timer()
@@ -749,11 +694,7 @@ def update_selected_platform(click, initial_site):
     ], prevent_initial_call=True, background=True
 )
 def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, active_platforms, question_choice,):
-    p0 = timeit.default_timer()
-    row_style = {'display': 'block'}
-    list_group = html.Div()
-    list_group.children = []
-    # print('+_+_+_+_+_+_+_+ Starting plot callback...')
+
     if selection_data is not None:
         selected_json = json.loads(selection_data)
         if 'site_code' in selected_json:
@@ -762,20 +703,28 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
             raise exceptions.PreventUpdate
     else:
         raise exceptions.PreventUpdate
-    if active_platforms is not None:
-        active = pd.read_json(json.loads(active_platforms))
-    p1 = timeit.default_timer()
-    if active is not None and selected_platform is not None:
+    if plot_start_date is not None and len(plot_start_date) > 0 and plot_end_date is not None and len(plot_end_date)>0:
         plot_time = '&time>='+plot_start_date+'&time<='+plot_end_date
-        to_plot = active.loc[active['site_code'] == selected_platform]
-        if to_plot.empty:
+    else:
+        raise exceptions.PreventUpdate
+
+    with constants.postgres_engine.connect() as conn:
+        plots_df = pd.read_sql(f"SELECT * from discovery WHERE site_code='{selected_platform}' AND question_id='{question_choice}' ORDER BY did", con=conn)
+    p0 = timeit.default_timer()
+    row_style = {'display': 'block'}
+    list_group = html.Div()
+    list_group.children = []
+    # print('+_+_+_+_+_+_+_+ Starting plot callback...')
+
+    p1 = timeit.default_timer()
+    if selected_platform is not None:
+
+        if plots_df.empty:
             return [row_style, "", get_blank(selected_platform, plot_start_date, plot_end_date), list_group, '', '']
-        dids = to_plot['did'].to_list()
-        num_rows = len(dids)
-        current_search = None
-        for a_search in discover_json['discovery']:
-            if a_search == question_choice:
-                current_search = discover_json['discovery'][a_search]
+        # Get list of datasets which contain these site codes for this question
+
+        num_rows = plots_df.shape[0]
+        dids = list(plots_df['did'])
         figure = make_subplots(rows=num_rows, cols=1, row_heights=[450]*num_rows, shared_xaxes='all', shared_yaxes=False, subplot_titles=dids, vertical_spacing=(.275/num_rows))
         dataset_idx = 0
         sub_plot_titles = []
@@ -789,54 +738,56 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
             t_pos = t_pos_1_4.copy()
             x_pos = x_pos_1_4.copy()
         p2 = timeit.default_timer()
-        for p_did in dids:
-            current_dataset = next(
-                (item for item in platform_json['config']['datasets'] if item['id'] == p_did), None)
-            p_url = current_dataset['url']
-            for search in current_search['search']:
-                link_group = dbc.ListGroup(horizontal=True)
-                link_group.children = []
-                for pd_data_url in search['datasets']:
-                    if p_did in pd_data_url:
-                        dataset_idx = dataset_idx + 1
-                        vlist = search['short_names'].copy()
-                        pvars = ','.join(vlist+['time', 'site_code'])
-                        plot_title = 'Plot of ' + ','.join(vlist) + ' at ' + selected_platform
-                        p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
-                        print('Making a plot of ' + p_url)
-                        df = pd.read_csv(p_url, skiprows=[1])
-                        sub_title = selected_platform
-                        bottom_title = current_dataset['title']
-                        if df.shape[0] > sub_sample_limit:
-                            df = df.sample(n=sub_sample_limit).sort_values('time')
-                            sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
-                        sub_plot_titles.append(sub_title)
-                        sub_plot_bottom_titles.append(bottom_title)
-                        l_labels = []
-                        for n, v in enumerate(vlist):
-                            if v in units_by_did[p_did]:
-                                l_labels.append(v + ' (' + units_by_did[p_did][v] + ')')
-                            else:
-                                l_labels.append(v)
-                        lines = px.line(df, x='time', y=vlist, labels=l_labels)
-                        legend_name = 'legend'
-                        if dataset_idx > 1:
-                            legend_name = 'legend' + str(dataset_idx)
-                        lines.update_traces(legend=legend_name)
-                        for ifig, fig in enumerate(list(lines.select_traces())):
-                            nfig = go.Figure(fig)
-                            nfig.update_traces(name=l_labels[ifig])
-                            figure.add_trace(list(nfig.select_traces())[0], row=dataset_idx, col=1)
-                        meta_item = dbc.ListGroupItem(current_dataset['title'] + ' at ' + selected_platform, href=current_dataset['url'], target='_blank')
-                        link_group.children.append(meta_item)
-                        read_data = pd.read_csv(p_url, skiprows=[1])
-                        item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
-                        link_group.children.append(item)
-                        item = dbc.ListGroupItem('.csv', href=p_url.replace('.htmlTable', '.csv'), target='_blank')
-                        link_group.children.append(item)
-                        item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
-                        link_group.children.append(item)
-                        list_group.children.append(link_group)
+        link_group = dbc.ListGroup(horizontal=True)
+        link_group.children = []
+        for dataset_idx, row in plots_df.iterrows():  # it has at most four rows. Don't panic.
+            dataset_idx = dataset_idx + 1
+            p_did = row['did']
+            with constants.postgres_engine.connect() as conn:
+                current_dataset = pd.read_sql(f"SELECT * from metadata where id='{p_did}'", con=conn)
+                units = pd.read_sql(f"SELECT * from units where did='{p_did}'", con=conn)
+            p_url = current_dataset['url'].values[0]
+            short_string = row['short_string']
+            pvars =  short_string + ',site_code,time'
+            p_url = p_url + '.csv?' + pvars + plot_time + '&site_code="' + selected_platform + '"'
+            print('Making a plot of ' + p_url)
+            plot_title = 'Plot of ' + short_string + ' at ' + selected_platform
+            df = pd.read_csv(p_url, skiprows=[1])
+            sub_title = selected_platform
+            bottom_title = current_dataset['title'].astype(str).values[0]
+            if df.shape[0] > sub_sample_limit:
+                df = df.sample(n=sub_sample_limit).sort_values('time')
+                sub_title = sub_title + ' (timeseries sub-sampled to ' + str(sub_sample_limit) + ' points) '
+            sub_plot_titles.append(sub_title)
+            sub_plot_bottom_titles.append(bottom_title)
+            l_labels = []
+            vlist = short_string.split(',')
+            for n, v in enumerate(vlist):
+                if v in units:
+                    unit = units[v].astype(str).values[0]
+                    l_labels.append(v + ' (' + unit + ')')
+                else:
+                    l_labels.append(v)
+            lines = px.line(df, x='time', y=vlist, labels=l_labels)
+            legend_name = 'legend'
+            if dataset_idx > 1:
+                legend_name = 'legend' + str(dataset_idx)
+            lines.update_traces(legend=legend_name)
+            for ifig, fig in enumerate(list(lines.select_traces())):
+                nfig = go.Figure(fig)
+                nfig.update_traces(name=l_labels[ifig])
+                figure.add_trace(list(nfig.select_traces())[0], row=dataset_idx, col=1)
+            
+            meta_item = dbc.ListGroupItem(str(current_dataset['title']) + ' at ' + selected_platform, href=str(current_dataset['url']), target='_blank')
+            link_group.children.append(meta_item)
+            read_data = pd.read_csv(p_url, skiprows=[1])
+            item = dbc.ListGroupItem('.html', href=p_url.replace('.csv', '.htmlTable'), target='_blank')
+            link_group.children.append(item)
+            item = dbc.ListGroupItem('.csv', href=p_url.replace('.htmlTable', '.csv'), target='_blank')
+            link_group.children.append(item)
+            item = dbc.ListGroupItem('.nc', href=p_url.replace('.csv', '.ncCF'), target='_blank')
+            link_group.children.append(item)
+            list_group.children.append(link_group)
         p3 = timeit.default_timer()
         figure.update_layout(height=height_of_row*num_rows)
         figure.update_layout(plot_bgcolor=plot_bg, hovermode='x', paper_bgcolor='white', margin=dict(l=80, r=80, b=80, t=80, ))
@@ -897,14 +848,14 @@ def plot_from_selected_platform(selection_data, plot_start_date, plot_end_date, 
         query = '?start_date=' + plot_start_date + '&end_date=' + plot_end_date + '&q=' + question_choice
         query = query + '&site_code=' + selected_platform + '&lat=' + str(selected_json['lat'])
         query = query + '&lon=' + str(selected_json['lon'])
-    p4 = timeit.default_timer()
-    # print('=-=-=-=-=-=-=-=-=-=-=-=-=  Finished plotting...')    
-    # print('\tTotal time: ' + convertSeconds(p4-p0))
-    # print('\t\tSet up, read platform: ' + convertSeconds(p1-p0))
-    # print('\t\tSubplot setup: ' + convertSeconds(p2-p1))
-    # print('\t\tRead data and plot: ' + convertSeconds(p3-p2))
-    # print('\t\tSet plot options: ' + convertSeconds(p4 -p3))               
-    return [row_style, plot_title, figure, list_group, query, '']
+        p4 = timeit.default_timer()
+        # print('=-=-=-=-=-=-=-=-=-=-=-=-=  Finished plotting...')    
+        # print('\tTotal time: ' + convertSeconds(p4-p0))
+        # print('\t\tSet up, read platform: ' + convertSeconds(p1-p0))
+        # print('\t\tSubplot setup: ' + convertSeconds(p2-p1))
+        # print('\t\tRead data and plot: ' + convertSeconds(p3-p2))
+        # print('\t\tSet plot options: ' + convertSeconds(p4 -p3))               
+        return [row_style, plot_title, figure, list_group, query, '']
 
 
 @app.callback(
