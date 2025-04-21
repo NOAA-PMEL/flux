@@ -10,6 +10,6 @@ multiprocess
 celery
 redis
 SQLAlchemy
+psycopg2-binary
 pg8000
-psycopg2
 git+https://github.com/noaaroland/sdig.git
