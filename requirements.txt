@@ -10,4 +10,5 @@ multiprocess
 celery
 redis
 SQLAlchemy
+pg8000
 git+https://github.com/noaaroland/sdig.git
