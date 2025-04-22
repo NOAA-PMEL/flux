@@ -157,7 +157,7 @@ color_discrete_map={
     'RAIN':'#636EFA', 
     'EVAP': '#EF553B', 
     'QL':'#636EFA', 
-    'QS': 'EF553B', 
+    'QS': '#EF553B', 
     'QN': '#636EFA'
 }
 
