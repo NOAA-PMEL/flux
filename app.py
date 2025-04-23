@@ -811,6 +811,7 @@ def plot_from_selected_platform(
         )
         dataset_idx = 0
         sub_plot_titles = []
+        sub_title_xpos = []
         sub_plot_bottom_titles = []
         if len(dids) == 2:
             y_pos = y_pos_2.copy()
@@ -862,6 +863,9 @@ def plot_from_selected_platform(
                     + str(sub_sample_limit)
                     + " points) "
                 )
+                sub_title_xpos.append(.165)
+            else:
+                sub_title_xpos.append(.045)
             sub_plot_titles.append(sub_title)
             sub_plot_bottom_titles.append(bottom_title)
             l_labels = []
@@ -959,7 +963,7 @@ def plot_from_selected_platform(
             figure["layout"]["annotations"][l].update(
                 {
                     "text": sub_plot_titles[l],
-                    "x": 0.0375,
+                    "x": sub_title_xpos[l],
                     "font_size": 22,
                     "y": y_pos[l] + t_pos[l],
                 }
