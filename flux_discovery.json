@@ -108,8 +108,7 @@
               "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_relative",
               "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/tao_flux_clim_lwr_absolute",
               "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_keo_flux",
-              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux",
-              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/WHOI_flux"
+              "http://hazy.pmel.noaa.gov:8140/erddap/tabledap/ocs_papa_flux"
             ]
           }
         ]

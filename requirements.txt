@@ -2,11 +2,14 @@ dash-design-kit
 dash>=2.5
 gunicorn
 pandas
-dash_bootstrap_components
 plotly>=6.0.1
 diskcache
 psutil
 multiprocess
 celery
 redis
+SQLAlchemy
+psycopg2-binary
+pg8000
+dash-ag-grid
 git+https://github.com/noaaroland/sdig.git
