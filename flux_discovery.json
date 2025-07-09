@@ -21,10 +21,7 @@
             "short_names": ["TAUE","TAUN"],
             "standard_name": ["surface_downward_eastward_stress","surface_downward_northward_stress"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/Stratus_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOTS_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/NTAS_flux"
+              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
             ]
           }
       ]
@@ -48,10 +45,7 @@
             "short_names": ["QN"],
             "standard_names": ["surface_net_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/Stratus_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOTS_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/NTAS_flux"
+              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
             ]
           }
       ]
@@ -77,10 +71,7 @@
             "short_names": ["QL", "QS"],
             "standard_names":["surface_upward_latent_heat_flux", "surface_upward_sensible_heat_flux"],
             "datasets": [
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/Stratus_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOTS_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/NTAS_flux"
+              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
             ]
           }
         ]
@@ -99,10 +90,7 @@
               "https://data.pmel.noaa.gov/pmel/erddap/tabledap/tao_flux_clim_lwr_absolute",
               "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_keo_flux",
               "https://data.pmel.noaa.gov/pmel/erddap/tabledap/ocs_papa_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/Stratus_met",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOTS_met",
-              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/NTAS_met"
+              "https://data.pmel.noaa.gov/pmel/erddap/tabledap/WHOI_flux"
             ]
           }
         ]
