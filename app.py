@@ -26,6 +26,7 @@ import dash_design_kit as ddk
 import os
 import sys
 import timeit
+from io import StringIO
 from urllib.parse import quote
 
 # Standard tools and utilities
@@ -463,9 +464,10 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
             if qin == in_data_question:
                 search_params = discover_json["discovery"][qin]["search"]
                 for search in search_params:
-                    vars_to_get = ['"' + short + '"' for short in search["short_names"]]
+                    short_names = search["short_names"]
+                    vars_to_get = ['"' + short + '"' for short in short_names]
                     read_dtypes = {}
-                    for short in search["short_names"]:
+                    for short in short_names:
                         read_dtypes[short] = np.float64
                     vars_to_get.append("time")
                     vars_to_get.append("site_code")
@@ -476,9 +478,12 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                             f"SELECT * from locations", con=conn
                         )
                     var_list = ",".join(vars_to_get)
+                    nobs_table = f'nobs_{"_".join(short_names)}'
+                    nobs_query = f'SELECT {var_list} FROM "{nobs_table}" WHERE {time_constraint}'
+                    # DEBUG print(nobs_query)
                     with constants.postgres_engine.connect() as conn:
                         have = pd.read_sql(
-                            f"SELECT {var_list} FROM nobs WHERE {time_constraint}",
+                            nobs_query,
                             con=conn,
                             dtype=read_dtypes,
                         )
@@ -487,12 +492,12 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                         csum["site_code"] = csum["site_code"].astype(str)
                         sum_n = None
                         if join_type == "or":
-                            csum["has_data"] = csum[search["short_names"]].sum(axis=1)
+                            csum["has_data"] = csum[short_names].sum(axis=1)
                             csum = csum.sort_values("site_code")
                             locations_to_map = locations_to_map.sort_values("site_code")
                             sum_n = csum.loc[csum["has_data"] > 0]
                         if join_type == "and":
-                            chk_vars = search["short_names"]
+                            chk_vars = short_names
                             criteria = ""
                             for vix, v in enumerate(chk_vars):
                                 if vix > 0:
@@ -501,8 +506,8 @@ def update_platform_state(in_start_date, in_end_date, in_data_question):
                             criteria = "csum[(" + criteria + ")]"
                             # eval dereferences all the stuff in the string and runs it
                             sum_n = pd.eval(criteria)
-                        # DEBUG print('sum of counts')
-                        # DEBUG print(sum_n)
+                        # DEBUG                         print('sum of counts')
+                        # DEBUG                         print(sum_n)
                         if sum_n is not None and sum_n.shape[0] > 0:
                             # sum_n is the platforms that have data.
                             # This merge operation (as explained here:
@@ -608,9 +613,9 @@ def make_location_map(
         selected_plat = json.loads(in_selected_platform)
     tp2 = timeit.default_timer()
     if in_active_platforms is not None and in_inactive_platforms is not None:
-        data_for_yes = pd.read_json(json.loads(in_active_platforms))
+        data_for_yes = pd.read_json(StringIO(json.loads(in_active_platforms)))
         # DEBUG print(data_for_yes)
-        data_for_no = pd.read_json(json.loads(in_inactive_platforms))
+        data_for_no = pd.read_json(StringIO(json.loads(in_inactive_platforms)))
         no_trace = None
         if data_for_no.shape[0] > 0:
             no_trace = go.Scattermap(

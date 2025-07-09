@@ -14,6 +14,11 @@ find the answer to the question of which sites have:
 Selecting a station will plot the relevant parameters and provide a link to 
 download the plotted data in a variety of formats.
 
+#### To add an ERDDAP data set to this dashboard, follow these steps.
+
+1. Add the ERDDAP URL to the section of the flux_discovery.json file that is appropriate for the way the variables are named in the the data set. You might have to add it to several sections since many data sets have variables from more than one of the discover questions.
+1. Run all the cells in make_nobs_db.ipynb to recreate all the databases that drive the app to now inclue the data source you just added.
+
 #### Legal Disclaimer
 *This repository is a software product and is not official communication
 of the National Oceanic and Atmospheric Administration (NOAA), or the
