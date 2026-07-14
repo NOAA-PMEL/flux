@@ -3,6 +3,7 @@ from dash import (
     dash,
     Dash,
     callback,
+    get_asset_url,
     html,
     dcc,
     dash_table,
@@ -258,6 +259,7 @@ app.layout = ddk.App(theme=theme.theme,
                                             step=month_step,
                                             marks=time_marks,
                                             updatemode='mouseup',
+                                            allow_direct_input=False,
                                             allowCross=False)
                     ])
                 ]),
@@ -281,7 +283,7 @@ app.layout = ddk.App(theme=theme.theme,
         ddk.Card(style={'margin-bottom': '10px'}, children=[
         ddk.Block(children=[
             ddk.Block(width=.08, children=[
-                html.Img(src='https://www.pmel.noaa.gov/sites/default/files/PMEL-meatball-logo-sm.png',
+                html.Img(src=get_asset_url('noaa-logo-rgb-2022.png'),
                             height=100,
                             width=100),
             ]),
@@ -857,12 +859,15 @@ def plot_from_selected_platform(
             p_url = (
                 p_url
                 + ".csv?"
-                + pvars
+            )
+            query_string = (
+                pvars
                 + plot_time
                 + '&site_code="'
                 + selected_platform
                 + '"'
             )
+            p_url = p_url + quote(query_string)
             print("Making a plot of " + p_url)
             plot_title = "Plot of " + short_string + " at " + selected_platform
             df = pd.read_csv(p_url, skiprows=[1])
